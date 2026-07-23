@@ -216,9 +216,14 @@ h1 {
 }
 
 .button-secondary {
-  color: var(--text);
-  border: 1px solid rgba(255, 255, 255, 0.14);
-  background: rgba(255, 255, 255, 0.03);
+  color: #ffffff;
+  border: 1px solid #111111;
+  background: #111111;
+}
+
+.button-secondary:hover {
+  background: #000000;
+  border-color: #000000;
 }
 
 .blog-shell {
@@ -267,7 +272,35 @@ h1 {
   gap: 18px;
 }
 
-.topbar-nav a {
+.nav-tab {
+  padding: 10px 14px;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  color: var(--text-soft);
+  font-weight: 600;
+  background: transparent;
+  cursor: pointer;
+  transition:
+    color 180ms ease,
+    background 180ms ease,
+    border-color 180ms ease,
+    transform 180ms ease;
+}
+
+.nav-tab:hover {
+  color: var(--brand);
+  background: var(--brand-soft);
+  transform: translateY(-1px);
+}
+
+.nav-tab.is-active {
+  color: var(--brand);
+  background: var(--brand-soft);
+  border-color: rgba(216, 75, 42, 0.18);
+}
+
+.topbar-nav a,
+.topbar-nav button {
   color: var(--text-soft);
   text-decoration: none;
   font-weight: 600;
@@ -318,6 +351,10 @@ h1 {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 320px;
   gap: 18px;
+}
+
+.separated-layout {
+  align-items: start;
 }
 
 .blog-main {
@@ -608,6 +645,18 @@ h1 {
   background: #6b7280;
 }
 
+.format-pdf {
+  background: #b42318;
+}
+
+.format-excel {
+  background: #027a48;
+}
+
+.format-word {
+  background: #175cd3;
+}
+
 .note-image {
   width: 100%;
   height: auto;
@@ -648,6 +697,38 @@ h1 {
 
 .compact-table-preview {
   max-height: 200px;
+}
+
+.document-teaser {
+  display: grid;
+  gap: 6px;
+  margin-top: 14px;
+  padding: 16px;
+  border-radius: 14px;
+  border: 1px solid var(--line);
+  background: #fff;
+}
+
+.document-teaser strong {
+  color: var(--text-main);
+  font-size: 1rem;
+}
+
+.document-teaser span,
+.document-teaser small {
+  color: var(--text-soft);
+}
+
+.document-pdf {
+  background: linear-gradient(135deg, #fff1f0, #ffffff);
+}
+
+.document-excel {
+  background: linear-gradient(135deg, #ecfdf3, #ffffff);
+}
+
+.document-word {
+  background: linear-gradient(135deg, #eff4ff, #ffffff);
 }
 
 .note-modal-backdrop,
@@ -736,6 +817,50 @@ h1 {
 .note-modal-body {
   display: grid;
   gap: 18px;
+}
+
+.document-detail {
+  display: grid;
+  gap: 16px;
+}
+
+.document-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.modal-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 10px 14px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  color: var(--text-main);
+  text-decoration: none;
+  background: var(--paper-soft);
+}
+
+.document-meta-card {
+  display: grid;
+  gap: 8px;
+  padding: 16px 18px;
+  border-radius: 18px;
+  background: var(--paper-soft);
+  border: 1px solid var(--line);
+}
+
+.document-meta-card p {
+  color: var(--text-soft);
+}
+
+.pdf-frame {
+  width: 100%;
+  min-height: 72vh;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background: #fff;
 }
 
 .note-modal-image-wrap {

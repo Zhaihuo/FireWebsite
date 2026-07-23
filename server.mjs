@@ -119,10 +119,15 @@ function sanitizeNote(note) {
   return {
     id: String(note.id || `${Date.now()}-${Math.random().toString(16).slice(2)}`),
     title: String(note.title || '未命名文件').slice(0, 200),
-    type: ['image', 'table', 'text', 'data', 'file'].includes(note.type) ? note.type : 'file',
+    type: ['image', 'table', 'text', 'data', 'pdf', 'excel', 'word', 'file'].includes(note.type)
+      ? note.type
+      : 'file',
     size: String(note.size || ''),
     content: String(note.content || '').slice(0, 2_000_000),
     preview: typeof note.preview === 'string' ? note.preview.slice(0, 10_000_000) : null,
+    sourceUrl: typeof note.sourceUrl === 'string' ? note.sourceUrl.slice(0, 10_000_000) : null,
+    extension: String(note.extension || '').slice(0, 20),
+    mimeType: String(note.mimeType || '').slice(0, 200),
     rows: Array.isArray(note.rows)
       ? note.rows
           .slice(0, 12)
@@ -337,7 +342,7 @@ async function handleApi(request, response) {
       await writeDb(auth.db)
       sendJson(response, 200, { notes: auth.user.notes })
     } catch {
-      sendJson(response, 400, { message: '移动到垃圾箱失败。' })
+      sendJson(response, 400, { message: '移动到垃圾管理失败。' })
     }
     return
   }
@@ -380,7 +385,7 @@ async function handleApi(request, response) {
       }
 
       if (!note.deletedAt) {
-        sendJson(response, 400, { message: '请先将笔记移入垃圾箱，再进行彻底删除。' })
+        sendJson(response, 400, { message: '请先将笔记移入垃圾管理，再进行彻底删除。' })
         return
       }
 
