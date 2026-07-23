@@ -1,0 +1,71 @@
+:root {
+  font-family:
+    'Space Grotesk',
+    'Segoe UI',
+    'PingFang SC',
+    'Microsoft YaHei',
+    sans-serif;
+  line-height: 1.6;
+  font-weight: 400;
+  color: #ecf3ff;
+  background:
+    radial-gradient(circle at top, rgba(67, 122, 255, 0.18), transparent 32%),
+    linear-gradient(180deg, #07111f 0%, #081625 45%, #050813 100%);
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  --text: rgba(236, 243, 255, 0.8);
+  --text-h: #f6f9ff;
+  --muted: rgba(236, 243, 255, 0.56);
+  --accent: #9ce4ff;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  margin: 0;
+  min-width: 320px;
+  min-height: 100vh;
+}
+
+body::before,
+body::after {
+  content: '';
+  position: fixed;
+  inset: auto;
+  width: 380px;
+  height: 380px;
+  border-radius: 999px;
+  filter: blur(80px);
+  pointer-events: none;
+  z-index: 0;
+}
+
+body::before {
+  top: -90px;
+  right: -120px;
+  background: rgba(79, 139, 255, 0.18);
+}
+
+body::after {
+  left: -120px;
+  bottom: -120px;
+  background: rgba(140, 100, 255, 0.14);
+}
+
+a {
+  color: inherit;
+}
+
+#root {
+  position: relative;
+  z-index: 1;
+  min-height: 100vh;
+}
