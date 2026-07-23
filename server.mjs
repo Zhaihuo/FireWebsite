@@ -18,22 +18,22 @@ const defaultDb = {
 const mimeTypes = {
   '.css': 'text/css; charset=utf-8',
   '.html': 'text/html; charset=utf-8',
+  '.ico': 'image/x-icon',
+  '.jpeg': 'image/jpeg',
+  '.jpg': 'image/jpeg',
   '.js': 'application/javascript; charset=utf-8',
   '.json': 'application/json; charset=utf-8',
-  '.svg': 'image/svg+xml',
   '.png': 'image/png',
-  '.jpg': 'image/jpeg',
-  '.jpeg': 'image/jpeg',
+  '.svg': 'image/svg+xml',
   '.webp': 'image/webp',
-  '.ico': 'image/x-icon',
 }
 
 let writeQueue = Promise.resolve()
 
 function sendJson(response, statusCode, payload) {
   response.writeHead(statusCode, {
-    'Content-Type': 'application/json; charset=utf-8',
     'Cache-Control': 'no-store',
+    'Content-Type': 'application/json; charset=utf-8',
   })
   response.end(JSON.stringify(payload))
 }
@@ -69,8 +69,8 @@ async function readDb() {
   const parsed = JSON.parse(raw)
 
   return {
-    users: Array.isArray(parsed.users) ? parsed.users : [],
     sessions: Array.isArray(parsed.sessions) ? parsed.sessions : [],
+    users: Array.isArray(parsed.users) ? parsed.users : [],
   }
 }
 
@@ -80,8 +80,8 @@ async function writeDb(nextDb) {
       dbPath,
       JSON.stringify(
         {
-          users: nextDb.users,
           sessions: nextDb.sessions,
+          users: nextDb.users,
         },
         null,
         2,
@@ -129,7 +129,22 @@ function sanitizeNote(note) {
           .map((row) => (Array.isArray(row) ? row.slice(0, 8).map((cell) => String(cell).slice(0, 200)) : []))
       : [],
     createdAt: String(note.createdAt || ''),
+    deletedAt: note.deletedAt ? String(note.deletedAt) : null,
   }
+}
+
+function ensureUserNotes(user) {
+  if (!Array.isArray(user.notes)) {
+    user.notes = []
+  }
+
+  user.notes = user.notes.map((note) => sanitizeNote(note))
+  return user.notes
+}
+
+function findNote(user, noteId) {
+  const notes = ensureUserNotes(user)
+  return notes.find((item) => item.id === noteId) || null
 }
 
 async function requireUser(request, response) {
@@ -152,7 +167,8 @@ async function requireUser(request, response) {
     return null
   }
 
-  return { db, user, token }
+  ensureUserNotes(user)
+  return { db, token, user }
 }
 
 async function handleApi(request, response) {
@@ -175,10 +191,10 @@ async function handleApi(request, response) {
         return
       }
 
+      const now = new Date().toISOString()
       const salt = randomBytes(16).toString('hex')
       const userId = randomBytes(12).toString('hex')
       const token = createToken()
-      const now = new Date().toISOString()
 
       db.users.push({
         id: userId,
@@ -196,9 +212,9 @@ async function handleApi(request, response) {
 
       await writeDb(db)
       sendJson(response, 201, {
+        notes: [],
         token,
         user: { username },
-        notes: [],
       })
     } catch (error) {
       if (error instanceof Error && error.message === 'PAYLOAD_TOO_LARGE') {
@@ -223,6 +239,7 @@ async function handleApi(request, response) {
         return
       }
 
+      ensureUserNotes(user)
       const token = createToken()
       db.sessions = db.sessions.filter((item) => item.userId !== user.id)
       db.sessions.push({
@@ -233,9 +250,9 @@ async function handleApi(request, response) {
 
       await writeDb(db)
       sendJson(response, 200, {
+        notes: user.notes,
         token,
         user: { username: user.username },
-        notes: Array.isArray(user.notes) ? user.notes : [],
       })
     } catch {
       sendJson(response, 400, { message: '登录请求无效。' })
@@ -248,8 +265,8 @@ async function handleApi(request, response) {
     if (!auth) return
 
     sendJson(response, 200, {
+      notes: auth.user.notes,
       user: { username: auth.user.username },
-      notes: Array.isArray(auth.user.notes) ? auth.user.notes : [],
     })
     return
   }
@@ -272,9 +289,7 @@ async function handleApi(request, response) {
     const auth = await requireUser(request, response)
     if (!auth) return
 
-    sendJson(response, 200, {
-      notes: Array.isArray(auth.user.notes) ? auth.user.notes : [],
-    })
+    sendJson(response, 200, { notes: auth.user.notes })
     return
   }
 
@@ -285,20 +300,95 @@ async function handleApi(request, response) {
 
       const body = await readBody(request)
       const incoming = Array.isArray(body.notes) ? body.notes : []
-      const notes = incoming.map(sanitizeNote)
+      const notes = incoming.map((note) => ({
+        ...sanitizeNote(note),
+        deletedAt: null,
+      }))
 
-      auth.user.notes = [...notes, ...(Array.isArray(auth.user.notes) ? auth.user.notes : [])]
+      auth.user.notes = [...notes, ...auth.user.notes]
       await writeDb(auth.db)
 
-      sendJson(response, 201, {
-        notes: auth.user.notes,
-      })
+      sendJson(response, 201, { notes: auth.user.notes })
     } catch (error) {
       if (error instanceof Error && error.message === 'PAYLOAD_TOO_LARGE') {
         sendJson(response, 413, { message: '上传内容太大，请拆分后重试。' })
         return
       }
       sendJson(response, 400, { message: '笔记保存失败。' })
+    }
+    return
+  }
+
+  if (request.method === 'POST' && url.pathname === '/api/notes/trash') {
+    try {
+      const auth = await requireUser(request, response)
+      if (!auth) return
+
+      const body = await readBody(request)
+      const noteId = String(body.id || '')
+      const note = findNote(auth.user, noteId)
+
+      if (!note) {
+        sendJson(response, 404, { message: '没有找到要删除的笔记。' })
+        return
+      }
+
+      note.deletedAt = new Date().toISOString()
+      await writeDb(auth.db)
+      sendJson(response, 200, { notes: auth.user.notes })
+    } catch {
+      sendJson(response, 400, { message: '移动到垃圾箱失败。' })
+    }
+    return
+  }
+
+  if (request.method === 'POST' && url.pathname === '/api/notes/restore') {
+    try {
+      const auth = await requireUser(request, response)
+      if (!auth) return
+
+      const body = await readBody(request)
+      const noteId = String(body.id || '')
+      const note = findNote(auth.user, noteId)
+
+      if (!note) {
+        sendJson(response, 404, { message: '没有找到要恢复的笔记。' })
+        return
+      }
+
+      note.deletedAt = null
+      await writeDb(auth.db)
+      sendJson(response, 200, { notes: auth.user.notes })
+    } catch {
+      sendJson(response, 400, { message: '恢复笔记失败。' })
+    }
+    return
+  }
+
+  if (request.method === 'POST' && url.pathname === '/api/notes/remove') {
+    try {
+      const auth = await requireUser(request, response)
+      if (!auth) return
+
+      const body = await readBody(request)
+      const noteId = String(body.id || '')
+      const note = findNote(auth.user, noteId)
+
+      if (!note) {
+        sendJson(response, 404, { message: '没有找到要彻底删除的笔记。' })
+        return
+      }
+
+      if (!note.deletedAt) {
+        sendJson(response, 400, { message: '请先将笔记移入垃圾箱，再进行彻底删除。' })
+        return
+      }
+
+      auth.user.notes = auth.user.notes.filter((item) => item.id !== noteId)
+      await writeDb(auth.db)
+      sendJson(response, 200, { notes: auth.user.notes })
+    } catch {
+      sendJson(response, 400, { message: '彻底删除失败。' })
     }
     return
   }
