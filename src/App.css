@@ -474,6 +474,80 @@ h1 {
   font-size: 0.92rem;
 }
 
+.project-topbar {
+  display: grid;
+  grid-template-columns: minmax(0, 1.1fr) minmax(280px, 0.9fr);
+  gap: 14px;
+  margin-bottom: 16px;
+}
+
+.project-create-form {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 12px;
+  padding: 18px;
+  border-radius: 18px;
+  background: var(--paper-soft);
+  border: 1px solid var(--line);
+}
+
+.project-create-form input {
+  width: 100%;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  color: var(--text-main);
+  background: #fff;
+}
+
+.project-search-box {
+  min-height: auto;
+}
+
+.project-layout {
+  display: grid;
+  grid-template-columns: 300px minmax(0, 1fr);
+  gap: 16px;
+}
+
+.project-list,
+.project-detail {
+  display: grid;
+  gap: 14px;
+}
+
+.project-card {
+  padding: 20px;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  text-align: left;
+  background: var(--paper-soft);
+  cursor: pointer;
+}
+
+.project-card.is-active {
+  border-color: rgba(216, 75, 42, 0.35);
+  box-shadow: 0 0 0 3px rgba(216, 75, 42, 0.08);
+}
+
+.project-card h3 {
+  margin: 8px 0 8px;
+  color: var(--text-main);
+}
+
+.project-card p:last-child {
+  color: var(--text-soft);
+}
+
+.project-detail-head {
+  display: grid;
+  gap: 14px;
+}
+
+.project-upload-zone {
+  min-height: auto;
+}
+
 .upload-zone,
 .search-box {
   position: relative;
@@ -822,6 +896,26 @@ h1 {
   line-height: 1.7;
 }
 
+.confirm-field {
+  display: grid;
+  gap: 8px;
+  margin-top: 16px;
+}
+
+.confirm-field span {
+  color: var(--text-soft);
+  font-size: 0.9rem;
+}
+
+.confirm-field input {
+  width: 100%;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  color: var(--text-main);
+  background: #fff;
+}
+
 .note-modal-head {
   display: flex;
   justify-content: space-between;
@@ -1034,6 +1128,7 @@ h1 {
 @media (max-width: 920px) {
   .login-panel,
   .notes-toolbar,
+  .project-topbar,
   .blog-topbar {
     grid-template-columns: 1fr;
   }
@@ -1041,6 +1136,11 @@ h1 {
   .batch-toolbar {
     flex-direction: column;
     align-items: flex-start;
+  }
+
+  .project-layout,
+  .project-create-form {
+    grid-template-columns: 1fr;
   }
 
   .login-copy h1 {
