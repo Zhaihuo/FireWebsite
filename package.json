@@ -5,9 +5,11 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "dev:server": "node server.mjs",
     "build": "vite build",
     "lint": "oxlint",
     "preview": "vite preview",
+    "start": "node server.mjs",
     "deploy:check": "npm run build"
   },
   "dependencies": {
