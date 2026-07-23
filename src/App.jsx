@@ -31,7 +31,7 @@ const profile = {
   intro:
     '把个人网站、上传笔记和服务端存储整理成一个更接近技术博客的工作空间。登录后，内容会跟随账号永久保存到服务器。',
   location: 'Remote · China',
-  status: '当前站点已经支持登录、上传、搜索、回收站和永久删除。',
+  status: '当前站点已经支持登录、上传、搜索、回收站、永久删除和批量操作。',
 }
 
 const frontendPosts = [
@@ -95,7 +95,7 @@ const pageMeta = {
   notes: {
     eyebrow: 'Notebook',
     title: '笔记管理区',
-    description: '上传、搜索并打开你自己的笔记内容。',
+    description: '上传、搜索、批量管理并打开你自己的笔记内容。',
   },
   trash: {
     eyebrow: 'Trash',
@@ -228,6 +228,30 @@ async function createNoteFromFile(file) {
   }
 }
 
+function triggerFileDownload(fileName, href) {
+  const anchor = document.createElement('a')
+  anchor.href = href
+  anchor.download = fileName
+  anchor.rel = 'noreferrer'
+  document.body.appendChild(anchor)
+  anchor.click()
+  document.body.removeChild(anchor)
+}
+
+function downloadNote(note) {
+  if (note.sourceUrl) {
+    triggerFileDownload(note.title, note.sourceUrl)
+    return
+  }
+
+  const tableContent = note.rows?.length ? note.rows.map((row) => row.join('\t')).join('\n') : ''
+  const content = note.content || tableContent || ''
+  const blob = new Blob([content], { type: note.mimeType || 'text/plain;charset=utf-8' })
+  const blobUrl = URL.createObjectURL(blob)
+  triggerFileDownload(note.title || `note-${note.id}.txt`, blobUrl)
+  window.setTimeout(() => URL.revokeObjectURL(blobUrl), 1000)
+}
+
 async function apiFetch(path, options = {}, token = null) {
   const headers = new Headers(options.headers || {})
   headers.set('Content-Type', 'application/json')
@@ -355,11 +379,28 @@ function DocumentTeaser({ note }) {
   )
 }
 
-function NoteCard({ note, onOpen, onDelete }) {
+function SelectionCheckbox({ checked, onChange, label }) {
+  return (
+    <label className="select-toggle" onClick={(event) => event.stopPropagation()}>
+      <input type="checkbox" checked={checked} onChange={onChange} aria-label={label} />
+      <span>选择</span>
+    </label>
+  )
+}
+
+function NoteCard({ note, isSelected, onToggleSelect, onOpen, onDelete }) {
   const showDocumentTeaser = ['pdf', 'excel', 'word', 'file'].includes(note.type)
 
   return (
-    <article className="note-card">
+    <article className={isSelected ? 'note-card is-selected' : 'note-card'}>
+      <div className="card-select-row">
+        <SelectionCheckbox
+          checked={isSelected}
+          onChange={() => onToggleSelect(note.id)}
+          label={`选择笔记 ${note.title}`}
+        />
+      </div>
+
       <button className="note-card-main" type="button" onClick={() => onOpen(note)}>
         <div className="note-card-head">
           <span className={`format-pill format-${note.type}`}>{formatLabels[note.type]}</span>
@@ -407,9 +448,17 @@ function NoteCard({ note, onOpen, onDelete }) {
   )
 }
 
-function TrashCard({ note, onOpen, onRestore, onDeleteForever }) {
+function TrashCard({ note, isSelected, onToggleSelect, onOpen, onRestore, onDeleteForever }) {
   return (
-    <article className="trash-card">
+    <article className={isSelected ? 'trash-card is-selected' : 'trash-card'}>
+      <div className="card-select-row">
+        <SelectionCheckbox
+          checked={isSelected}
+          onChange={() => onToggleSelect(note.id)}
+          label={`选择已删除笔记 ${note.title}`}
+        />
+      </div>
+
       <button className="trash-card-main" type="button" onClick={() => onOpen(note)}>
         <div className="note-card-head">
           <span className={`format-pill format-${note.type}`}>{formatLabels[note.type]}</span>
@@ -619,9 +668,55 @@ function BackendView() {
   )
 }
 
+function BatchToolbar({
+  totalCount,
+  selectedCount,
+  allSelected,
+  onSelectAllToggle,
+  onClearSelection,
+  onDownload,
+  onPrimaryAction,
+  onSecondaryAction,
+  primaryLabel,
+  secondaryLabel,
+}) {
+  return (
+    <div className="batch-toolbar">
+      <div className="batch-toolbar-left">
+        <SelectionCheckbox
+          checked={allSelected && totalCount > 0}
+          onChange={onSelectAllToggle}
+          label="全选当前列表"
+        />
+        <span className="batch-count">
+          已选 {selectedCount} / {totalCount}
+        </span>
+      </div>
+
+      <div className="batch-toolbar-actions">
+        <button className="small-action" type="button" onClick={onDownload} disabled={!selectedCount}>
+          批量下载
+        </button>
+        {secondaryLabel ? (
+          <button className="small-action" type="button" onClick={onSecondaryAction} disabled={!selectedCount}>
+            {secondaryLabel}
+          </button>
+        ) : null}
+        <button className="small-action danger-action" type="button" onClick={onPrimaryAction} disabled={!selectedCount}>
+          {primaryLabel}
+        </button>
+        <button className="small-action" type="button" onClick={onClearSelection} disabled={!selectedCount}>
+          清空选择
+        </button>
+      </div>
+    </div>
+  )
+}
+
 function NotesView({
   activeNotes,
   filteredNotes,
+  selectedIds,
   isUploading,
   query,
   serverMessage,
@@ -629,7 +724,14 @@ function NotesView({
   onUpload,
   onOpenNote,
   onDeleteRequest,
+  onToggleSelect,
+  onToggleSelectAll,
+  onClearSelection,
+  onBatchDownload,
+  onBatchDelete,
 }) {
+  const allSelected = filteredNotes.length > 0 && filteredNotes.every((note) => selectedIds.includes(note.id))
+
   return (
     <section className="blog-section card">
       <div className="section-head">
@@ -637,7 +739,7 @@ function NotesView({
           <p className="eyebrow">Notebook</p>
           <h2>笔记管理区</h2>
         </div>
-        <span>上传、搜索、打开详情</span>
+        <span>上传、搜索、批量下载、批量删除</span>
       </div>
 
       <div className="notes-toolbar">
@@ -661,6 +763,17 @@ function NotesView({
         </label>
       </div>
 
+      <BatchToolbar
+        totalCount={filteredNotes.length}
+        selectedCount={selectedIds.length}
+        allSelected={allSelected}
+        onSelectAllToggle={onToggleSelectAll}
+        onClearSelection={onClearSelection}
+        onDownload={onBatchDownload}
+        onPrimaryAction={onBatchDelete}
+        primaryLabel="批量删除"
+      />
+
       <div className="note-stats">
         <span>{activeNotes.length} 份正常资料</span>
         <span>{filteredNotes.length} 条匹配结果</span>
@@ -669,7 +782,14 @@ function NotesView({
 
       <div className="notes-feed">
         {filteredNotes.map((note) => (
-          <NoteCard key={note.id} note={note} onOpen={onOpenNote} onDelete={onDeleteRequest} />
+          <NoteCard
+            key={note.id}
+            note={note}
+            isSelected={selectedIds.includes(note.id)}
+            onToggleSelect={onToggleSelect}
+            onOpen={onOpenNote}
+            onDelete={onDeleteRequest}
+          />
         ))}
       </div>
 
@@ -678,7 +798,22 @@ function NotesView({
   )
 }
 
-function TrashView({ trashedNotes, onOpenNote, onRestoreRequest, onDeleteForeverRequest }) {
+function TrashView({
+  activeNotes,
+  trashedNotes,
+  selectedIds,
+  onOpenNote,
+  onRestoreRequest,
+  onDeleteForeverRequest,
+  onToggleSelect,
+  onToggleSelectAll,
+  onClearSelection,
+  onBatchDownload,
+  onBatchRestore,
+  onBatchDeleteForever,
+}) {
+  const allSelected = trashedNotes.length > 0 && trashedNotes.every((note) => selectedIds.includes(note.id))
+
   return (
     <section className="blog-section card">
       <div className="section-head">
@@ -686,11 +821,25 @@ function TrashView({ trashedNotes, onOpenNote, onRestoreRequest, onDeleteForever
           <p className="eyebrow">Trash</p>
           <h2>垃圾管理区</h2>
         </div>
-        <span>恢复内容或彻底删除</span>
+        <span>恢复内容、批量下载、彻底删除</span>
       </div>
+
+      <BatchToolbar
+        totalCount={trashedNotes.length}
+        selectedCount={selectedIds.length}
+        allSelected={allSelected}
+        onSelectAllToggle={onToggleSelectAll}
+        onClearSelection={onClearSelection}
+        onDownload={onBatchDownload}
+        onPrimaryAction={onBatchDeleteForever}
+        onSecondaryAction={onBatchRestore}
+        primaryLabel="批量彻底删除"
+        secondaryLabel="批量恢复"
+      />
 
       <div className="note-stats">
         <span>{trashedNotes.length} 份已删除资料</span>
+        <span>正常笔记 {activeNotes.length} 份</span>
         <span>只有在这里再次删除，文件才会彻底消失</span>
       </div>
 
@@ -699,6 +848,8 @@ function TrashView({ trashedNotes, onOpenNote, onRestoreRequest, onDeleteForever
           <TrashCard
             key={note.id}
             note={note}
+            isSelected={selectedIds.includes(note.id)}
+            onToggleSelect={onToggleSelect}
             onOpen={onOpenNote}
             onRestore={onRestoreRequest}
             onDeleteForever={onDeleteForeverRequest}
@@ -729,7 +880,7 @@ function SidebarPanel({ activePage, session, activeNotes, trashedNotes }) {
           <ul className="sidebar-list">
             <li>登录页与主站分离，不再把登录放到内容页中。</li>
             <li>前端、后端、笔记、垃圾管理分别进入独立内容区。</li>
-            <li>现在支持 PDF、Excel、Word、TXT 等文件上传和详情打开。</li>
+            <li>现在支持 PDF、Excel、Word、TXT 的上传，以及批量下载和批量删除。</li>
           </ul>
         </section>
       </>
@@ -769,7 +920,7 @@ function SidebarPanel({ activePage, session, activeNotes, trashedNotes }) {
           <ul className="sidebar-list">
             <li>第一次删除：弹出确认窗口，确认后进入垃圾管理。</li>
             <li>在垃圾管理中再次删除：才会从服务器彻底清除。</li>
-            <li>已删除内容支持恢复回正常笔记区。</li>
+            <li>已删除内容支持单个恢复，也支持批量恢复。</li>
           </ul>
         </section>
 
@@ -813,6 +964,8 @@ function WebsiteShell({
   activeNotes,
   trashedNotes,
   filteredNotes,
+  selectedNoteIds,
+  selectedTrashIds,
   query,
   isUploading,
   isDeleteWorking,
@@ -830,6 +983,17 @@ function WebsiteShell({
   onDeleteRequest,
   onRestoreRequest,
   onDeleteForeverRequest,
+  onToggleNoteSelect,
+  onToggleTrashSelect,
+  onToggleAllNotes,
+  onToggleAllTrash,
+  onClearNoteSelection,
+  onClearTrashSelection,
+  onBatchDownloadNotes,
+  onBatchDeleteNotes,
+  onBatchDownloadTrash,
+  onBatchRestoreTrash,
+  onBatchDeleteTrash,
   onCancelConfirm,
   onConfirmAction,
 }) {
@@ -841,10 +1005,18 @@ function WebsiteShell({
     if (activePage === 'trash') {
       return (
         <TrashView
+          activeNotes={activeNotes}
           trashedNotes={trashedNotes}
+          selectedIds={selectedTrashIds}
           onOpenNote={onOpenNote}
           onRestoreRequest={onRestoreRequest}
           onDeleteForeverRequest={onDeleteForeverRequest}
+          onToggleSelect={onToggleTrashSelect}
+          onToggleSelectAll={onToggleAllTrash}
+          onClearSelection={onClearTrashSelection}
+          onBatchDownload={onBatchDownloadTrash}
+          onBatchRestore={onBatchRestoreTrash}
+          onBatchDeleteForever={onBatchDeleteTrash}
         />
       )
     }
@@ -853,6 +1025,7 @@ function WebsiteShell({
       <NotesView
         activeNotes={activeNotes}
         filteredNotes={filteredNotes}
+        selectedIds={selectedNoteIds}
         isUploading={isUploading}
         query={query}
         serverMessage={serverMessage}
@@ -860,6 +1033,11 @@ function WebsiteShell({
         onUpload={onUpload}
         onOpenNote={onOpenNote}
         onDeleteRequest={onDeleteRequest}
+        onToggleSelect={onToggleNoteSelect}
+        onToggleSelectAll={onToggleAllNotes}
+        onClearSelection={onClearNoteSelection}
+        onBatchDownload={onBatchDownloadNotes}
+        onBatchDelete={onBatchDeleteNotes}
       />
     )
   }
@@ -942,6 +1120,8 @@ function App() {
   const [activePage, setActivePage] = useState('notes')
   const [activeNote, setActiveNote] = useState(null)
   const [confirmConfig, setConfirmConfig] = useState(null)
+  const [selectedNoteIds, setSelectedNoteIds] = useState([])
+  const [selectedTrashIds, setSelectedTrashIds] = useState([])
   const [isBooting, setIsBooting] = useState(true)
   const [isSubmittingAuth, setIsSubmittingAuth] = useState(false)
   const [isUploading, setIsUploading] = useState(false)
@@ -997,8 +1177,43 @@ function App() {
     )
   }, [activeNotes, query])
 
+  useEffect(() => {
+    setSelectedNoteIds((current) => current.filter((id) => filteredNotes.some((note) => note.id === id)))
+  }, [filteredNotes])
+
+  useEffect(() => {
+    setSelectedTrashIds((current) => current.filter((id) => trashedNotes.some((note) => note.id === id)))
+  }, [trashedNotes])
+
   function updateCredential(key, value) {
     setCredentials((current) => ({ ...current, [key]: value }))
+  }
+
+  function toggleSelection(setter, id) {
+    setter((current) => (current.includes(id) ? current.filter((item) => item !== id) : [...current, id]))
+  }
+
+  function toggleAllSelection(setter, collection, selectedIds) {
+    const ids = collection.map((item) => item.id)
+    const allSelected = ids.length > 0 && ids.every((id) => selectedIds.includes(id))
+    setter(allSelected ? [] : ids)
+  }
+
+  function buildSelectionDescription(count, label, extra = '') {
+    return `确认要${label}${count}个已选择的内容吗？${extra}`
+  }
+
+  function requestBatchAction(action, noteIds, title, confirmText, description, onSuccessPage = null) {
+    if (!noteIds.length) return
+
+    setConfirmConfig({
+      action,
+      noteIds,
+      title,
+      confirmText,
+      description,
+      onSuccessPage,
+    })
   }
 
   async function handleAuthSubmit(event) {
@@ -1017,6 +1232,8 @@ function App() {
       setSession(data.user)
       setNotes(Array.isArray(data.notes) ? data.notes : [])
       setActivePage('notes')
+      setSelectedNoteIds([])
+      setSelectedTrashIds([])
       window.localStorage.setItem(TOKEN_KEY, data.token)
       setCredentials({ username: '', password: '' })
       setAuthMessage(authMode === 'login' ? '登录成功，正在进入主页。' : '注册成功，正在进入主页。')
@@ -1045,6 +1262,8 @@ function App() {
     setActivePage('notes')
     setActiveNote(null)
     setConfirmConfig(null)
+    setSelectedNoteIds([])
+    setSelectedTrashIds([])
     setAuthMode('login')
     setAuthMessage('你已退出登录，请重新登录。')
     setServerMessage('服务端存储已启用。')
@@ -1071,6 +1290,7 @@ function App() {
       const nextNotes = Array.isArray(data.notes) ? data.notes : []
       setNotes(nextNotes)
       setActivePage('notes')
+      setSelectedNoteIds([])
       setServerMessage(`上传成功，服务器中已保存 ${nextNotes.filter((note) => !note.deletedAt).length} 份正常资料。`)
       event.target.value = ''
     } catch (error) {
@@ -1085,7 +1305,7 @@ function App() {
       action: 'trash',
       confirmText: '确认删除',
       description: `确认将“${note.title}”移入垃圾管理吗？移入后不会立刻彻底删除。`,
-      noteId: note.id,
+      noteIds: [note.id],
       title: '移动到垃圾管理',
     })
   }
@@ -1095,7 +1315,7 @@ function App() {
       action: 'restore',
       confirmText: '确认恢复',
       description: `确认恢复“${note.title}”吗？恢复后它会重新出现在正常笔记区。`,
-      noteId: note.id,
+      noteIds: [note.id],
       title: '恢复笔记',
     })
   }
@@ -1105,15 +1325,29 @@ function App() {
       action: 'remove',
       confirmText: '彻底删除',
       description: `确认彻底删除“${note.title}”吗？这一步执行后将无法恢复。`,
-      noteId: note.id,
+      noteIds: [note.id],
       title: '彻底删除文件',
     })
+  }
+
+  function handleBatchDownload(collection, selectedIds, emptyMessage) {
+    const selectedNotes = collection.filter((note) => selectedIds.includes(note.id))
+    if (!selectedNotes.length) {
+      setServerMessage(emptyMessage)
+      return
+    }
+
+    selectedNotes.forEach((note, index) => {
+      window.setTimeout(() => downloadNote(note), index * 180)
+    })
+    setServerMessage(`已开始下载 ${selectedNotes.length} 个文件。`)
   }
 
   async function handleConfirmAction() {
     if (!confirmConfig || !token) return
 
     const currentAction = confirmConfig
+    const noteIds = Array.isArray(currentAction.noteIds) ? currentAction.noteIds : []
     setIsDeleteWorking(true)
     setConfirmConfig(null)
 
@@ -1124,26 +1358,31 @@ function App() {
         trash: '/api/notes/trash',
       }
 
-      await apiFetch(
-        endpointMap[currentAction.action],
-        {
-          method: 'POST',
-          body: JSON.stringify({ id: currentAction.noteId }),
-        },
-        token,
-      )
+      for (const id of noteIds) {
+        await apiFetch(
+          endpointMap[currentAction.action],
+          {
+            method: 'POST',
+            body: JSON.stringify({ id }),
+          },
+          token,
+        )
+      }
 
       await refreshNotes(token)
       setActiveNote((current) =>
-        current?.id === currentAction.noteId && currentAction.action !== 'restore' ? null : current,
+        current && noteIds.includes(current.id) && currentAction.action !== 'restore' ? null : current,
       )
 
       if (currentAction.action === 'trash') {
-        setServerMessage('文件已移入垃圾管理。')
+        setSelectedNoteIds([])
+        setServerMessage(noteIds.length > 1 ? `已将 ${noteIds.length} 个文件移入垃圾管理。` : '文件已移入垃圾管理。')
       } else if (currentAction.action === 'restore') {
-        setServerMessage('文件已恢复到正常笔记区。')
+        setSelectedTrashIds([])
+        setServerMessage(noteIds.length > 1 ? `已恢复 ${noteIds.length} 个文件到正常笔记区。` : '文件已恢复到正常笔记区。')
       } else {
-        setServerMessage('文件已从垃圾管理中彻底删除。')
+        setSelectedTrashIds([])
+        setServerMessage(noteIds.length > 1 ? `已彻底删除 ${noteIds.length} 个文件。` : '文件已从垃圾管理中彻底删除。')
       }
     } catch (error) {
       setConfirmConfig(currentAction)
@@ -1173,6 +1412,8 @@ function App() {
       activeNotes={activeNotes}
       trashedNotes={trashedNotes}
       filteredNotes={filteredNotes}
+      selectedNoteIds={selectedNoteIds}
+      selectedTrashIds={selectedTrashIds}
       query={query}
       isUploading={isUploading}
       isDeleteWorking={isDeleteWorking}
@@ -1190,6 +1431,41 @@ function App() {
       onDeleteRequest={requestMoveToTrash}
       onRestoreRequest={requestRestore}
       onDeleteForeverRequest={requestDeleteForever}
+      onToggleNoteSelect={(id) => toggleSelection(setSelectedNoteIds, id)}
+      onToggleTrashSelect={(id) => toggleSelection(setSelectedTrashIds, id)}
+      onToggleAllNotes={() => toggleAllSelection(setSelectedNoteIds, filteredNotes, selectedNoteIds)}
+      onToggleAllTrash={() => toggleAllSelection(setSelectedTrashIds, trashedNotes, selectedTrashIds)}
+      onClearNoteSelection={() => setSelectedNoteIds([])}
+      onClearTrashSelection={() => setSelectedTrashIds([])}
+      onBatchDownloadNotes={() => handleBatchDownload(filteredNotes, selectedNoteIds, '请先选择要下载的笔记。')}
+      onBatchDeleteNotes={() =>
+        requestBatchAction(
+          'trash',
+          selectedNoteIds,
+          '批量移动到垃圾管理',
+          '确认批量删除',
+          buildSelectionDescription(selectedNoteIds.length, '删除', '确认后会先移入垃圾管理。'),
+        )
+      }
+      onBatchDownloadTrash={() => handleBatchDownload(trashedNotes, selectedTrashIds, '请先选择要下载的已删除文件。')}
+      onBatchRestoreTrash={() =>
+        requestBatchAction(
+          'restore',
+          selectedTrashIds,
+          '批量恢复笔记',
+          '确认批量恢复',
+          buildSelectionDescription(selectedTrashIds.length, '恢复', '恢复后会重新出现在正常笔记区。'),
+        )
+      }
+      onBatchDeleteTrash={() =>
+        requestBatchAction(
+          'remove',
+          selectedTrashIds,
+          '批量彻底删除',
+          '确认彻底删除',
+          buildSelectionDescription(selectedTrashIds.length, '彻底删除', '这一步执行后将无法恢复。'),
+        )
+      }
       onCancelConfirm={() => setConfirmConfig(null)}
       onConfirmAction={handleConfirmAction}
     />

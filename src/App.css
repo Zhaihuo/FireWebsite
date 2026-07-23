@@ -449,6 +449,31 @@ h1 {
   gap: 14px;
 }
 
+.batch-toolbar {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  align-items: center;
+  margin-top: 16px;
+  padding: 16px 18px;
+  border-radius: 18px;
+  background: var(--paper-soft);
+  border: 1px solid var(--line);
+}
+
+.batch-toolbar-left,
+.batch-toolbar-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+}
+
+.batch-count {
+  color: var(--text-soft);
+  font-size: 0.92rem;
+}
+
 .upload-zone,
 .search-box {
   position: relative;
@@ -541,6 +566,33 @@ h1 {
   border-radius: 18px;
   background: var(--paper-soft);
   border: 1px solid var(--line);
+}
+
+.note-card.is-selected,
+.trash-card.is-selected {
+  border-color: rgba(216, 75, 42, 0.45);
+  box-shadow: 0 0 0 3px rgba(216, 75, 42, 0.08);
+}
+
+.card-select-row {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 12px;
+}
+
+.select-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--text-soft);
+  font-size: 0.88rem;
+  cursor: pointer;
+}
+
+.select-toggle input {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--brand);
 }
 
 .note-card-main,
@@ -984,6 +1036,11 @@ h1 {
   .notes-toolbar,
   .blog-topbar {
     grid-template-columns: 1fr;
+  }
+
+  .batch-toolbar {
+    flex-direction: column;
+    align-items: flex-start;
   }
 
   .login-copy h1 {
