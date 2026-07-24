@@ -1,6 +1,7 @@
 import { createHash, randomBytes } from 'node:crypto'
 import { createServer } from 'node:http'
 import { access, mkdir, readFile, writeFile } from 'node:fs/promises'
+import { networkInterfaces } from 'node:os'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 
@@ -9,6 +10,7 @@ const dataDir = path.join(__dirname, 'data')
 const dbPath = path.join(dataDir, 'db.json')
 const distDir = path.join(__dirname, 'dist')
 const port = Number(process.env.PORT || 3100)
+const host = process.env.HOST || '0.0.0.0'
 
 const defaultDb = {
   users: [],
@@ -29,6 +31,20 @@ const mimeTypes = {
 }
 
 let writeQueue = Promise.resolve()
+
+function getNetworkUrls(portNumber) {
+  const interfaces = networkInterfaces()
+  const urls = []
+
+  for (const items of Object.values(interfaces)) {
+    for (const item of items || []) {
+      if (item.family !== 'IPv4' || item.internal) continue
+      urls.push(`http://${item.address}:${portNumber}`)
+    }
+  }
+
+  return [...new Set(urls)]
+}
 
 function sendJson(response, statusCode, payload) {
   response.writeHead(statusCode, {
@@ -651,7 +667,15 @@ const server = createServer(async (request, response) => {
   await serveStatic(request, response)
 })
 
-server.listen(port, async () => {
+server.listen(port, host, async () => {
   await ensureDb()
   console.log(`Server running at http://localhost:${port}`)
+
+  const networkUrls = getNetworkUrls(port)
+  if (networkUrls.length) {
+    console.log('Available on your network:')
+    for (const url of networkUrls) {
+      console.log(`  ${url}`)
+    }
+  }
 })

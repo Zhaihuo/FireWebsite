@@ -5,6 +5,13 @@ cd /d "%~dp0"
 
 set "PORT=3100"
 set "URL=http://localhost:%PORT%/"
+set "LAN_IP="
+for /f "usebackq delims=" %%I in (`powershell -NoProfile -Command "(Get-NetIPAddress -AddressFamily IPv4 | Where-Object { $_.IPAddress -notlike '127.*' -and $_.IPAddress -notlike '169.254.*' -and $_.PrefixOrigin -ne 'WellKnown' } | Sort-Object InterfaceMetric | Select-Object -First 1 -ExpandProperty IPAddress)"`) do set "LAN_IP=%%I"
+if defined LAN_IP (
+  set "LAN_URL=http://%LAN_IP%:%PORT%/"
+) else (
+  set "LAN_URL="
+)
 
 echo.
 echo [1/5] Checking Node.js...
@@ -53,9 +60,15 @@ echo.
 echo FireWebsite is starting.
 echo Open this address if the browser did not open automatically:
 echo %URL%
+if defined LAN_URL (
+  echo.
+  echo LAN access for other computers on the same network:
+  echo %LAN_URL%
+)
 echo.
 echo Tips:
 echo - Keep the "FireWebsite Server" window open while using the site.
 echo - Close that window to stop the backend service.
+if defined LAN_URL echo - If another computer cannot open the site, allow Node.js or port %PORT% through Windows Firewall.
 echo.
 pause
