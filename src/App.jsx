@@ -25,6 +25,15 @@ const SUPPORTED_ACCEPT = [
 ].join(',')
 
 const ARTICLE_AUTO_SAVE_DELAY_MS = 1200
+const PAGE_MESSAGE_DEFAULTS = {
+  frontend: '这里会展示当前网站的页面组织、上传路径与整体体验。',
+  backend: '这里汇总账号、项目、资料与服务端持久化状态。',
+  notes: '服务端存储已启用，你的内容会跟账号一起保存。',
+  writing: '保存笔记后可持续编辑正文、上传附件，并自动保存修改。',
+  projects: '项目空间支持按文件与文件夹层级持续归档。',
+  trash: '只有在这里再次删除，内容才会彻底消失。',
+}
+
 const RICH_TEXT_FONT_OPTIONS = [
   { label: '杂志衬线', value: '"Palatino Linotype", "Georgia", "STSong", "Songti SC", serif' },
   { label: '现代无衬线', value: '"Segoe UI", "PingFang SC", "Microsoft YaHei UI", sans-serif' },
@@ -244,6 +253,10 @@ function getFileSize(bytes) {
   if (bytes < 1024) return `${bytes} B`
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
   return `${(bytes / 1024 / 1024).toFixed(1)} MB`
+}
+
+function getActiveProjectFileCount(project) {
+  return Array.isArray(project?.notes) ? project.notes.filter((note) => !note.deletedAt).length : 0
 }
 
 function parseTable(content, fileName) {
@@ -728,6 +741,7 @@ function TrashCard({ note, isSelected, onToggleSelect, onOpen, onRestore, onDele
         </div>
         <h3>{note.title}</h3>
         <p className="note-meta">删除时间：{formatBeijingTime(note.deletedAt)}</p>
+        {note.sourceLabel ? <p className="note-path">来源：{note.sourceLabel}</p> : null}
         {note.folderPath ? <p className="note-path">文件夹：{note.folderPath}</p> : null}
       </button>
 
@@ -763,6 +777,7 @@ function DocumentDetail({ note }) {
 
       <div className="document-meta-card">
         <p>文件名：{note.title}</p>
+        {note.sourceLabel ? <p>来源：{note.sourceLabel}</p> : null}
         {note.folderPath ? <p>文件夹：{note.folderPath}</p> : null}
         <p>文件类型：{formatLabels[note.type]}</p>
         <p>扩展名：{note.extension ? `.${note.extension}` : '未知'}</p>
@@ -1197,70 +1212,7 @@ function WritingView({
   const articleCountLabel = `${articles.length} 篇笔记`
   const attachmentCount = Array.isArray(articleDraft.attachments) ? articleDraft.attachments.length : 0
   const allSelected = filteredArticles.length > 0 && filteredArticles.every((article) => selectedArticleIds.includes(article.id))
-  const [typographyStyle, setTypographyStyle] = useState({
-    fontPreset: 'editorial',
-    fontSize: '18px',
-    colorPreset: 'ink',
-  })
-
-  const fontPresetMap = {
-    editorial: {
-      label: '杂志感',
-      editorFont: '"Palatino Linotype", "Georgia", "STSong", "Songti SC", serif',
-      previewFont: '"Palatino Linotype", "Georgia", "STSong", "Songti SC", serif',
-      titleFont: '"Georgia", "Times New Roman", "Songti SC", serif',
-      lineHeight: '2',
-    },
-    modern: {
-      label: '现代感',
-      editorFont: '"Segoe UI", "PingFang SC", "Microsoft YaHei UI", sans-serif',
-      previewFont: '"Segoe UI", "PingFang SC", "Microsoft YaHei UI", sans-serif',
-      titleFont: '"Segoe UI", "PingFang SC", "Microsoft YaHei UI", sans-serif',
-      lineHeight: '1.9',
-    },
-    classic: {
-      label: '书卷感',
-      editorFont: '"Noto Serif SC", "Source Han Serif SC", "Songti SC", serif',
-      previewFont: '"Noto Serif SC", "Source Han Serif SC", "Songti SC", serif',
-      titleFont: '"Noto Serif SC", "Source Han Serif SC", "Songti SC", serif',
-      lineHeight: '2.06',
-    },
-  }
-
-  const colorPresetMap = {
-    ink: {
-      label: '墨黑',
-      text: '#20293a',
-      summary: '#5d6574',
-      panel: 'rgba(255, 255, 255, 0.92)',
-    },
-    pine: {
-      label: '松青',
-      text: '#1f3a34',
-      summary: '#59706a',
-      panel: 'rgba(246, 251, 249, 0.94)',
-    },
-    plum: {
-      label: '梅灰',
-      text: '#3d3042',
-      summary: '#76687a',
-      panel: 'rgba(251, 247, 251, 0.94)',
-    },
-  }
-
-  const activeFontPreset = fontPresetMap[typographyStyle.fontPreset] || fontPresetMap.editorial
-  const activeColorPreset = colorPresetMap[typographyStyle.colorPreset] || colorPresetMap.ink
   const editorHtml = contentToEditorHtml(articleDraft.content)
-  const writingTypographyStyle = {
-    '--writing-editor-font-active': activeFontPreset.editorFont,
-    '--writing-preview-font-active': activeFontPreset.previewFont,
-    '--writing-title-font-active': activeFontPreset.titleFont,
-    '--writing-font-size-active': typographyStyle.fontSize,
-    '--writing-line-height-active': activeFontPreset.lineHeight,
-    '--writing-text-color-active': activeColorPreset.text,
-    '--writing-summary-color-active': activeColorPreset.summary,
-    '--writing-panel-tint-active': activeColorPreset.panel,
-  }
 
   useEffect(() => {
     if (!editorRef.current) return
@@ -1325,7 +1277,7 @@ function WritingView({
   }
 
   return (
-    <section className="blog-section card section-writing" style={writingTypographyStyle}>
+    <section className="blog-section card section-writing">
       <div className="section-head">
         <div>
           <p className="eyebrow">内容创作</p>
@@ -1410,61 +1362,6 @@ function WritingView({
             </div>
           </div>
 
-          <section className="writing-style-panel card-lite">
-            <div className="writing-style-panel-head">
-              <div>
-                <p className="eyebrow">排版控制</p>
-                <h3>文字样式</h3>
-              </div>
-              <span>同步作用于编辑区与预览区</span>
-            </div>
-
-            <div className="writing-style-grid">
-              <label className="writing-style-field">
-                <span>字体风格</span>
-                <select
-                  value={typographyStyle.fontPreset}
-                  onChange={(event) => setTypographyStyle((current) => ({ ...current, fontPreset: event.target.value }))}
-                >
-                  {Object.entries(fontPresetMap).map(([key, item]) => (
-                    <option key={key} value={key}>
-                      {item.label}
-                    </option>
-                  ))}
-                </select>
-              </label>
-
-              <label className="writing-style-field">
-                <span>字号大小</span>
-                <select
-                  value={typographyStyle.fontSize}
-                  onChange={(event) => setTypographyStyle((current) => ({ ...current, fontSize: event.target.value }))}
-                >
-                  <option value="16px">紧凑</option>
-                  <option value="18px">舒适</option>
-                  <option value="20px">宽松</option>
-                  <option value="22px">阅读感</option>
-                </select>
-              </label>
-
-              <div className="writing-style-field">
-                <span>文字色调</span>
-                <div className="writing-tone-row">
-                  {Object.entries(colorPresetMap).map(([key, item]) => (
-                    <button
-                      key={key}
-                      type="button"
-                      className={typographyStyle.colorPreset === key ? 'tone-chip is-active' : 'tone-chip'}
-                      onClick={() => setTypographyStyle((current) => ({ ...current, colorPreset: key }))}
-                    >
-                      {item.label}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            </div>
-          </section>
-
           <div className="writing-cover card-lite">
             <div className="writing-cover-preview">
               {articleDraft.coverImage ? <img src={articleDraft.coverImage} alt={articleDraft.title || '笔记封面'} /> : <div className="cover-placeholder">封面预览</div>}
@@ -1531,6 +1428,7 @@ function WritingView({
           <div className="writing-compose-grid">
             <label className="writing-field">
               <span>正文</span>
+              <p className="writing-toolbar-tip">选中文字后，可立即调整加粗、斜体、下划线、字体、字号与颜色。</p>
               <div className="writing-rich-toolbar">
                 <button className="small-action" type="button" onClick={() => applyRichTextCommand('bold')}>
                   加粗
@@ -1745,6 +1643,7 @@ function ProjectsView({
   activeProjectId,
   selectedIds,
   isUploadingProject,
+  serverMessage,
   onProjectQueryChange,
   onProjectNameChange,
   onCreateProject,
@@ -1766,7 +1665,7 @@ function ProjectsView({
   }, [projects, projectQuery])
 
   const activeProject = projects.find((project) => project.id === activeProjectId) || filteredProjects[0] || null
-  const activeProjectNotes = useMemo(() => activeProject?.notes || [], [activeProject])
+  const activeProjectNotes = useMemo(() => (activeProject?.notes || []).filter((note) => !note.deletedAt), [activeProject])
   const allSelected = activeProjectNotes.length > 0 && activeProjectNotes.every((note) => selectedIds.includes(note.id))
   const activeProjectTree = useMemo(() => buildFolderTree(activeProjectNotes), [activeProjectNotes])
 
@@ -1805,7 +1704,7 @@ function ProjectsView({
             >
               <p className="post-category">项目</p>
               <h3>{project.name}</h3>
-              <p>{project.notes.length} 个文件</p>
+              <p>{getActiveProjectFileCount(project)} 个文件</p>
             </button>
           ))}
 
@@ -1819,7 +1718,7 @@ function ProjectsView({
                 <div>
                   <p className="eyebrow">当前项目</p>
                   <h3>{activeProject.name}</h3>
-                  <p className="sidebar-text">{activeProject.notes.length} 个已上传文件</p>
+                  <p className="sidebar-text">{activeProjectNotes.length} 个已上传文件</p>
                   <div className="note-card-footer">
                     <button className="small-action danger-action" type="button" onClick={() => onDeleteProjectRequest(activeProject)}>
                       删除项目
@@ -1854,6 +1753,11 @@ function ProjectsView({
                 primaryLabel="批量删除"
               />
 
+              <div className="note-stats">
+                <span>{activeProjectNotes.length} 份项目资料</span>
+                <span>{serverMessage}</span>
+              </div>
+
               <FolderNoteSections
                 tree={activeProjectTree}
                 selectedIds={selectedIds}
@@ -1861,7 +1765,7 @@ function ProjectsView({
                 onOpenNote={onOpenNote}
               />
 
-              {!activeProject.notes.length ? <div className="empty-state">这个项目里还没有文件，先上传一份试试。</div> : null}
+              {!activeProjectNotes.length ? <div className="empty-state">这个项目里还没有文件，先上传一份试试。</div> : null}
             </>
           ) : (
             <div className="empty-state">先创建一个项目，或从左侧选择已有项目。</div>
@@ -2187,6 +2091,7 @@ function WebsiteShell(props) {
         activeProjectId={activeProjectId}
         selectedIds={selectedProjectNoteIds}
         isUploadingProject={isUploadingProject}
+        serverMessage={serverMessage}
         onProjectQueryChange={onProjectQueryChange}
         onProjectNameChange={onProjectNameChange}
         onCreateProject={onCreateProject}
@@ -2322,11 +2227,29 @@ function App() {
   const [isUploadingArticleAssets, setIsUploadingArticleAssets] = useState(false)
   const [isDeleteWorking, setIsDeleteWorking] = useState(false)
   const [authMessage, setAuthMessage] = useState('注册后即可把内容永久保存到服务器。')
-  const [serverMessage, setServerMessage] = useState('服务端存储已启用。')
+  const [serverMessages, setServerMessages] = useState(PAGE_MESSAGE_DEFAULTS)
   const articleDraftRef = useRef(articleDraft)
   const articleAutoSaveTimerRef = useRef(null)
   const articleAutoSaveReadyRef = useRef(false)
   const lastSavedArticleFingerprintRef = useRef(buildArticleDraftFingerprint(createEmptyArticle()))
+  const serverMessage = serverMessages[activePage] || PAGE_MESSAGE_DEFAULTS[activePage] || ''
+
+  function setServerMessage(scope, message) {
+    setServerMessages((current) => ({
+      ...current,
+      [scope]: message || PAGE_MESSAGE_DEFAULTS[scope] || '',
+    }))
+  }
+
+  function setServerMessagesForScopes(updates) {
+    setServerMessages((current) => ({
+      ...current,
+      ...Object.fromEntries(
+        Object.entries(updates).map(([scope, message]) => [scope, message || PAGE_MESSAGE_DEFAULTS[scope] || '']),
+      ),
+    }))
+  }
+
 
   async function restoreSession(storedToken) {
     const data = await apiFetch('/api/auth/me', {}, storedToken)
@@ -2340,7 +2263,12 @@ function App() {
     setActiveArticleId(nextArticles[0]?.id || '')
     setArticleDraft(nextArticles[0] || createEmptyArticle())
     setActiveProjectId(nextProjects[0]?.id || '')
-    setServerMessage('已从服务端加载你的常用文件和项目。')
+    setServerMessagesForScopes({
+      notes: '已从服务端加载你的常用资料。',
+      projects: '已从服务端加载你的项目空间。',
+      trash: PAGE_MESSAGE_DEFAULTS.trash,
+      writing: PAGE_MESSAGE_DEFAULTS.writing,
+    })
   }
 
   useEffect(() => {
@@ -2359,7 +2287,32 @@ function App() {
   }, [])
 
   const activeNotes = useMemo(() => notes.filter((note) => !note.deletedAt), [notes])
-  const trashedNotes = useMemo(() => notes.filter((note) => note.deletedAt), [notes])
+  const noteTrash = useMemo(
+    () => notes.filter((note) => note.deletedAt).map((note) => ({ ...note, sourceScope: 'notes', sourceLabel: '资料中心' })),
+    [notes],
+  )
+  const projectTrash = useMemo(
+    () =>
+      projects.flatMap((project) =>
+        (project.notes || [])
+          .filter((note) => note.deletedAt)
+          .map((note) => ({
+            ...note,
+            sourceScope: 'project',
+            sourceLabel: `项目空间 / ${project.name}`,
+            projectId: project.id,
+            projectName: project.name,
+          })),
+      ),
+    [projects],
+  )
+  const trashedNotes = useMemo(
+    () =>
+      [...noteTrash, ...projectTrash].sort(
+        (left, right) => new Date(right.deletedAt || 0).getTime() - new Date(left.deletedAt || 0).getTime(),
+      ),
+    [noteTrash, projectTrash],
+  )
 
   const filteredNotes = useMemo(() => {
     const keyword = query.trim().toLowerCase()
@@ -2376,7 +2329,7 @@ function App() {
     () => projects.find((project) => project.id === activeProjectId) || projects[0] || null,
     [projects, activeProjectId],
   )
-  const activeProjectNotes = useMemo(() => activeProject?.notes || [], [activeProject])
+  const activeProjectNotes = useMemo(() => (activeProject?.notes || []).filter((note) => !note.deletedAt), [activeProject])
   const activeArticle = useMemo(
     () => articles.find((article) => article.id === activeArticleId) || articles[0] || null,
     [articles, activeArticleId],
@@ -2557,7 +2510,10 @@ function App() {
       window.localStorage.setItem(TOKEN_KEY, data.token)
       setCredentials({ username: '', password: '' })
       setAuthMessage(authMode === 'login' ? '登录成功，正在进入主页。' : '注册成功，正在进入主页。')
-      setServerMessage('服务端存储已启用，你的内容会跟账号一起保存。')
+      setServerMessages({
+        ...PAGE_MESSAGE_DEFAULTS,
+        notes: '服务端存储已启用，你的内容会跟账号一起保存。',
+      })
     } catch (error) {
       setAuthMessage(error instanceof Error ? error.message : '登录失败，请稍后重试。')
     } finally {
@@ -2596,7 +2552,7 @@ function App() {
     setSelectedArticleIds([])
     setAuthMode('login')
     setAuthMessage('你已退出登录，请重新登录。')
-    setServerMessage('服务端存储已启用。')
+    setServerMessages(PAGE_MESSAGE_DEFAULTS)
   }
 
   function handleCreateArticle() {
@@ -2604,7 +2560,7 @@ function App() {
     setArticleDraft(createEmptyArticle())
     setIsCreatingArticle(true)
     setActivePage('writing')
-    setServerMessage('新的笔记草稿已创建，可以开始编辑。')
+    setServerMessage('writing', '新的笔记草稿已创建，可以开始编辑。')
   }
 
   function handleSelectArticle(articleId) {
@@ -2661,12 +2617,12 @@ function App() {
         silent ? `已自动保存：${formatBeijingTime(savedArticle.updatedAt || new Date().toISOString())}` : '当前内容已手动保存。',
       )
       if (!silent) {
-        setServerMessage(status === 'published' ? '笔记已发布。' : '草稿已保存。')
+        setServerMessage('writing', status === 'published' ? '笔记已发布。' : '草稿已保存。')
       }
       return savedArticle
     } catch (error) {
       setArticleAutoSaveLabel(silent ? '自动保存失败，请稍后重试。' : '手动保存失败。')
-      setServerMessage(error instanceof Error ? error.message : '保存笔记失败，请稍后重试。')
+      setServerMessage('writing', error instanceof Error ? error.message : '保存笔记失败，请稍后重试。')
       return null
     } finally {
       setIsSavingArticle(false)
@@ -2692,9 +2648,9 @@ function App() {
     try {
       const coverImage = await readFileAsDataUrl(file)
       setArticleDraft((current) => ({ ...current, coverImage }))
-      setServerMessage('封面图片已加载到编辑区。')
+      setServerMessage('writing', '封面图片已加载到编辑区。')
     } catch {
-      setServerMessage('读取封面图片失败。')
+      setServerMessage('writing', '读取封面图片失败。')
     } finally {
       event.target.value = ''
     }
@@ -2716,7 +2672,7 @@ function App() {
     }
 
     setIsUploadingArticleAssets(true)
-    setServerMessage('正在上传笔记附件...')
+    setServerMessage('writing', '正在上传笔记附件...')
 
     try {
       let nextArticles = articles
@@ -2742,9 +2698,9 @@ function App() {
       setActiveArticleId(articleId)
       setArticleDraft(latestArticle)
       setIsCreatingArticle(false)
-      setServerMessage('笔记附件上传成功。')
+      setServerMessage('writing', '笔记附件上传成功。')
     } catch (error) {
-      setServerMessage(error instanceof Error ? error.message : '附件上传失败，请稍后重试。')
+      setServerMessage('writing', error instanceof Error ? error.message : '附件上传失败，请稍后重试。')
     } finally {
       setIsUploadingArticleAssets(false)
       event.target.value = ''
@@ -2774,37 +2730,37 @@ function App() {
       setArticles(nextArticles)
       setArticleDraft(nextArticle)
       setActiveNote((current) => (current?.id === attachment.id ? null : current))
-      setServerMessage('附件已删除。')
+      setServerMessage('writing', '附件已删除。')
     } catch (error) {
-      setServerMessage(error instanceof Error ? error.message : '删除附件失败，请稍后重试。')
+      setServerMessage('writing', error instanceof Error ? error.message : '删除附件失败，请稍后重试。')
     }
   }
 
   function handleBatchDownloadArticles(collection, ids, emptyMessage) {
     const selectedArticles = collection.filter((article) => ids.includes(article.id))
     if (!selectedArticles.length) {
-      setServerMessage(emptyMessage)
+      setServerMessage('writing', emptyMessage)
       return
     }
 
     selectedArticles.forEach((article, index) => {
       window.setTimeout(() => downloadArticle(article), index * 150)
     })
-    setServerMessage(`已开始下载 ${selectedArticles.length} 篇笔记。`)
+    setServerMessage('writing', `已开始下载 ${selectedArticles.length} 篇笔记。`)
   }
 
   async function uploadNotes(files, isFolderUpload = false) {
     if (!files.length || !token) return
 
     setIsUploading(true)
-    setServerMessage(isFolderUpload ? '正在读取文件夹并同步到服务器...' : '正在读取文件并同步到服务器...')
+    setServerMessage('notes', isFolderUpload ? '正在读取文件夹并同步到服务器...' : '正在读取文件并同步到服务器...')
 
     try {
       let latestNotes = notes
 
       for (let index = 0; index < files.length; index += 1) {
         if (files.length > 1) {
-          setServerMessage(`正在上传文件 ${index + 1}/${files.length}...`)
+          setServerMessage('notes', `正在上传文件 ${index + 1}/${files.length}...`)
         }
 
         const data = await apiFetch(
@@ -2821,9 +2777,9 @@ function App() {
 
       setNotes(latestNotes)
       setSelectedNoteIds([])
-      setServerMessage(isFolderUpload ? '文件夹上传完成。' : '文件上传成功。')
+      setServerMessage('notes', isFolderUpload ? '文件夹上传完成。' : '文件上传成功。')
     } catch (error) {
-      setServerMessage(error instanceof Error ? error.message : '上传失败，请稍后重试。')
+      setServerMessage('notes', error instanceof Error ? error.message : '上传失败，请稍后重试。')
     } finally {
       setIsUploading(false)
     }
@@ -2860,9 +2816,9 @@ function App() {
       setActiveProjectId(data.project?.id || nextProjects[0]?.id || '')
       setProjectName('')
       setActivePage('projects')
-      setServerMessage('项目创建成功。')
+      setServerMessage('projects', '项目创建成功。')
     } catch (error) {
-      setServerMessage(error instanceof Error ? error.message : '项目创建失败，请稍后重试。')
+      setServerMessage('projects', error instanceof Error ? error.message : '项目创建失败，请稍后重试。')
     }
   }
 
@@ -2870,14 +2826,14 @@ function App() {
     if (!files.length || !token || !activeProjectId) return
 
     setIsUploadingProject(true)
-    setServerMessage(isFolderUpload ? '正在上传项目文件夹...' : '正在上传项目文件...')
+    setServerMessage('projects', isFolderUpload ? '正在上传项目文件夹...' : '正在上传项目文件...')
 
     try {
       let nextProjects = projects
 
       for (let index = 0; index < files.length; index += 1) {
         if (files.length > 1) {
-          setServerMessage(`正在上传项目文件 ${index + 1}/${files.length}...`)
+          setServerMessage('projects', `正在上传项目文件 ${index + 1}/${files.length}...`)
         }
 
         const data = await apiFetch(
@@ -2895,9 +2851,9 @@ function App() {
       }
 
       setProjects(nextProjects)
-      setServerMessage(isFolderUpload ? '项目文件夹上传完成。' : '项目文件上传成功。')
+      setServerMessage('projects', isFolderUpload ? '项目文件夹上传完成。' : '项目文件上传成功。')
     } catch (error) {
-      setServerMessage(error instanceof Error ? error.message : '项目上传失败，请稍后重试。')
+      setServerMessage('projects', error instanceof Error ? error.message : '项目上传失败，请稍后重试。')
     } finally {
       setIsUploadingProject(false)
     }
@@ -2926,12 +2882,13 @@ function App() {
   }
 
   function requestRestore(note) {
+    const destination = note?.sourceScope === 'project' ? `项目“${note.projectName || '未命名项目'}”` : '资料中心'
     setConfirmConfig({
       action: 'restore',
       noteIds: [note.id],
-      title: '恢复常用文件',
+      title: '恢复文件',
       confirmText: '确认恢复',
-      description: `确认恢复“${note.title}”吗？恢复后会重新出现在常用文件区。`,
+      description: `确认恢复“${note.title}”吗？恢复后会回到${destination}。`,
     })
   }
 
@@ -2961,14 +2918,14 @@ function App() {
   function handleBatchDownload(collection, ids, emptyMessage) {
     const selectedNotes = collection.filter((note) => ids.includes(note.id))
     if (!selectedNotes.length) {
-      setServerMessage(emptyMessage)
+      setServerMessage(activePage === 'writing' ? 'writing' : activePage === 'projects' ? 'projects' : activePage === 'trash' ? 'trash' : 'notes', emptyMessage)
       return
     }
 
     selectedNotes.forEach((note, index) => {
       window.setTimeout(() => downloadNote(note), index * 150)
     })
-    setServerMessage(`已开始下载 ${selectedNotes.length} 个文件。`)
+    setServerMessage(activePage === 'projects' ? 'projects' : activePage === 'trash' ? 'trash' : 'notes', `已开始下载 ${selectedNotes.length} 个文件。`)
   }
 
   async function handleConfirmAction(payload = {}) {
@@ -2999,7 +2956,10 @@ function App() {
         setSelectedProjectNoteIds([])
         setActiveNote(null)
         setConfirmConfig(null)
-        setServerMessage('项目已删除。')
+        setServerMessagesForScopes({
+          projects: '项目已删除。',
+          trash: PAGE_MESSAGE_DEFAULTS.trash,
+        })
         return
       }
 
@@ -3022,7 +2982,10 @@ function App() {
         setSelectedProjectNoteIds([])
         setActiveNote((current) => (current && ids.includes(current.id) ? null : current))
         setConfirmConfig(null)
-        setServerMessage(ids.length > 1 ? `已从当前项目删除 ${ids.length} 个文件。` : '项目文件已删除。')
+        setServerMessagesForScopes({
+          projects: ids.length > 1 ? `已将 ${ids.length} 个项目文件移入回收记录。` : '项目文件已移入回收记录。',
+          trash: ids.length > 1 ? `已新增 ${ids.length} 个来自项目空间的回收项。` : '已新增 1 个来自项目空间的回收项。',
+        })
         return
       }
 
@@ -3052,11 +3015,11 @@ function App() {
         setArticleDraft((current) => (current?.id && ids.includes(current.id) ? nextArticles[0] || createEmptyArticle() : current))
         setIsCreatingArticle(!nextArticles.length)
         setConfirmConfig(null)
-        setServerMessage(ids.length > 1 ? `已删除 ${ids.length} 篇笔记。` : '笔记已删除。')
+        setServerMessage('writing', ids.length > 1 ? `已删除 ${ids.length} 篇笔记。` : '笔记已删除。')
         return
       }
 
-      await apiFetch(
+      const data = await apiFetch(
         '/api/notes/batch',
         {
           method: 'POST',
@@ -3068,23 +3031,43 @@ function App() {
         token,
       )
 
-      const refreshed = await apiFetch('/api/notes', { method: 'GET' }, token)
-      setNotes(Array.isArray(refreshed.notes) ? refreshed.notes : [])
+      setNotes(Array.isArray(data.notes) ? data.notes : [])
+      setProjects(Array.isArray(data.projects) ? data.projects : projects)
       setActiveNote((current) => (current && ids.includes(current.id) && currentAction.action !== 'restore' ? null : current))
       setConfirmConfig(null)
 
       if (currentAction.action === 'trash') {
         setSelectedNoteIds([])
-        setServerMessage(ids.length > 1 ? `已将 ${ids.length} 个文件移入回收站。` : '文件已移入回收站。')
+        setServerMessagesForScopes({
+          notes: ids.length > 1 ? `已将 ${ids.length} 个文件移入回收站。` : '文件已移入回收站。',
+          trash: ids.length > 1 ? `已新增 ${ids.length} 个回收项。` : '已新增 1 个回收项。',
+        })
       } else if (currentAction.action === 'restore') {
         setSelectedTrashIds([])
-        setServerMessage(ids.length > 1 ? `已恢复 ${ids.length} 个文件。` : '文件已恢复到常用文件区。')
+        setServerMessagesForScopes({
+          trash: ids.length > 1 ? `已恢复 ${ids.length} 个文件。` : '文件已恢复。',
+          notes: '资料中心已同步最新恢复结果。',
+          projects: '项目空间已同步最新恢复结果。',
+        })
       } else {
         setSelectedTrashIds([])
-        setServerMessage(ids.length > 1 ? `已彻底删除 ${ids.length} 个文件。` : '文件已从回收站中彻底删除。')
+        setServerMessagesForScopes({
+          trash: ids.length > 1 ? `已彻底删除 ${ids.length} 个文件。` : '文件已从回收记录中彻底删除。',
+          notes: '资料中心已同步最新删除结果。',
+          projects: '项目空间已同步最新删除结果。',
+        })
       }
     } catch (error) {
-      setServerMessage(error instanceof Error ? error.message : '操作失败，请稍后重试。')
+      setServerMessage(
+        scope === 'project'
+          ? 'projects'
+          : scope === 'articles'
+            ? 'writing'
+            : currentAction.action === 'trash'
+              ? 'notes'
+              : 'trash',
+        error instanceof Error ? error.message : '操作失败，请稍后重试。',
+      )
     } finally {
       setIsDeleteWorking(false)
     }
@@ -3213,11 +3196,11 @@ function App() {
       onBatchDeleteProjectNotes={() =>
         openScopedBatchConfirm(
           'project',
-          'remove',
+          'trash',
           selectedProjectNoteIds,
-          '批量删除项目文件',
-          '确认批量删除',
-          `确认从当前项目中删除 ${selectedProjectNoteIds.length} 个已选择的文件吗？删除后将从该项目中移除。`,
+          '批量移入回收记录',
+          '确认移入回收记录',
+          `确认将当前项目中选中的 ${selectedProjectNoteIds.length} 个文件移入回收记录吗？后续仍可在回收记录中恢复。`,
           activeProjectId,
         )
       }

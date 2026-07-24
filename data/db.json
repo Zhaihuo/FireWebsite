@@ -14,6 +14,11 @@
       "token": "2a4c4aaeaae8cd5c9bf1d88bfa69edad6e392e19ef983570",
       "userId": "edb1357b68b7452fc60bf155",
       "createdAt": "2026-07-24T07:12:40.313Z"
+    },
+    {
+      "token": "3eab7b08096589aee3eb5a4b72673f22048246d97bfce582",
+      "userId": "ed2ff610a64f3f1c2064827f",
+      "createdAt": "2026-07-24T08:31:41.050Z"
     }
   ],
   "users": [
@@ -44,6 +49,156 @@
       "notes": [],
       "projects": [],
       "createdAt": "2026-07-24T03:30:19.569Z"
+    },
+    {
+      "id": "ed2ff610a64f3f1c2064827f",
+      "username": "codex_test_274397",
+      "passwordHash": "3212c5e321f67edc4016ccc39ba517e97db947e61d5c3196c29eda053baa9a05",
+      "salt": "9aa7ed607a1bd3d6ef6afb56f41626d4",
+      "notes": [
+        {
+          "id": "b8ed4b0709f48f93d11121a6",
+          "title": "nested.txt",
+          "type": "text",
+          "size": "13 B",
+          "content": "nested file\r\n",
+          "preview": null,
+          "sourceUrl": "/uploads/ed2ff610a64f3f1c2064827f/b8ed4b0709f48f93d11121a6.txt",
+          "extension": "txt",
+          "relativePath": "upload-folder/子目录/nested.txt",
+          "folderPath": "upload-folder/子目录",
+          "mimeType": "text/plain",
+          "filePath": "ed2ff610a64f3f1c2064827f\\b8ed4b0709f48f93d11121a6.txt",
+          "rows": [],
+          "createdAt": "2026-07-24T08:06:04.262Z",
+          "deletedAt": null
+        },
+        {
+          "id": "68e5bc60addca4303f71b481",
+          "title": "readme.txt",
+          "type": "text",
+          "size": "18 B",
+          "content": "folder root file\r\n",
+          "preview": null,
+          "sourceUrl": "/uploads/ed2ff610a64f3f1c2064827f/68e5bc60addca4303f71b481.txt",
+          "extension": "txt",
+          "relativePath": "upload-folder/readme.txt",
+          "folderPath": "upload-folder",
+          "mimeType": "text/plain",
+          "filePath": "ed2ff610a64f3f1c2064827f\\68e5bc60addca4303f71b481.txt",
+          "rows": [],
+          "createdAt": "2026-07-24T08:06:04.250Z",
+          "deletedAt": null
+        },
+        {
+          "id": "982553d7faf0f218e4c27617",
+          "title": "sample.txt",
+          "type": "text",
+          "size": "21 B",
+          "content": "sample file content\r\n",
+          "preview": null,
+          "sourceUrl": "/uploads/ed2ff610a64f3f1c2064827f/982553d7faf0f218e4c27617.txt",
+          "extension": "txt",
+          "relativePath": "",
+          "folderPath": "",
+          "mimeType": "text/plain",
+          "filePath": "ed2ff610a64f3f1c2064827f\\982553d7faf0f218e4c27617.txt",
+          "rows": [],
+          "createdAt": "2026-07-24T08:05:21.383Z",
+          "deletedAt": null
+        }
+      ],
+      "projects": [
+        {
+          "id": "fe7536dac66f1da8395f5539",
+          "name": "测试项目A",
+          "createdAt": "2026-07-24T08:07:44.519Z",
+          "updatedAt": "2026-07-24T08:32:15.106Z",
+          "notes": [
+            {
+              "id": "e7881032bc23e6ef30abb76d",
+              "title": "nested.txt",
+              "type": "text",
+              "size": "13 B",
+              "content": "nested file\r\n",
+              "preview": null,
+              "sourceUrl": "/uploads/ed2ff610a64f3f1c2064827f/e7881032bc23e6ef30abb76d.txt",
+              "extension": "txt",
+              "relativePath": "upload-folder/子目录/nested.txt",
+              "folderPath": "upload-folder/子目录",
+              "mimeType": "text/plain",
+              "filePath": "ed2ff610a64f3f1c2064827f\\e7881032bc23e6ef30abb76d.txt",
+              "rows": [],
+              "createdAt": "2026-07-24T08:07:56.385Z",
+              "deletedAt": null
+            },
+            {
+              "id": "9639cbb8deeb601016f17e7d",
+              "title": "readme.txt",
+              "type": "text",
+              "size": "18 B",
+              "content": "folder root file\r\n",
+              "preview": null,
+              "sourceUrl": "/uploads/ed2ff610a64f3f1c2064827f/9639cbb8deeb601016f17e7d.txt",
+              "extension": "txt",
+              "relativePath": "upload-folder/readme.txt",
+              "folderPath": "upload-folder",
+              "mimeType": "text/plain",
+              "filePath": "ed2ff610a64f3f1c2064827f\\9639cbb8deeb601016f17e7d.txt",
+              "rows": [],
+              "createdAt": "2026-07-24T08:07:56.371Z",
+              "deletedAt": null
+            },
+            {
+              "id": "8301aaa3cf35188bc3140b86",
+              "title": "sample.txt",
+              "type": "text",
+              "size": "21 B",
+              "content": "sample file content\r\n",
+              "preview": null,
+              "sourceUrl": "/uploads/ed2ff610a64f3f1c2064827f/8301aaa3cf35188bc3140b86.txt",
+              "extension": "txt",
+              "relativePath": "",
+              "folderPath": "",
+              "mimeType": "text/plain",
+              "filePath": "ed2ff610a64f3f1c2064827f\\8301aaa3cf35188bc3140b86.txt",
+              "rows": [],
+              "createdAt": "2026-07-24T08:07:54.774Z",
+              "deletedAt": null
+            }
+          ]
+        }
+      ],
+      "articles": [
+        {
+          "id": "4588ebc75d3c3c77fc0f5e0e",
+          "title": "回归测试笔记",
+          "summary": "用于全面测试当前网站。",
+          "content": "<span style=\"font-weight: bold;\">正文测试内容</span>",
+          "coverImage": "",
+          "tags": [],
+          "status": "published",
+          "attachments": [],
+          "createdAt": "2026-07-24T08:31:03.242Z",
+          "updatedAt": "2026-07-24T08:31:09.811Z"
+        },
+        {
+          "id": "9729209b5a85d800275c3906",
+          "title": "测试笔记 A",
+          "summary": "这是一段测试摘要",
+          "content": "<span style=\"font-weight: bold;\">第一段内容</span><p><span style=\"font-weight: bold;\">第二段内容</span></p>",
+          "coverImage": "",
+          "tags": [
+            "测试",
+            "自动化"
+          ],
+          "status": "draft",
+          "attachments": [],
+          "createdAt": "2026-07-24T08:06:39.065Z",
+          "updatedAt": "2026-07-24T08:07:36.365Z"
+        }
+      ],
+      "createdAt": "2026-07-24T08:04:41.978Z"
     }
   ]
 }

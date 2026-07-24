@@ -486,6 +486,11 @@ function findProject(user, projectId) {
   return user.projects.find((item) => item.id === projectId) || null
 }
 
+function collectProjectNotes(user) {
+  ensureUserData(user)
+  return user.projects.flatMap((project) => project.notes || [])
+}
+
 function findArticle(user, articleId) {
   ensureUserData(user)
   return user.articles.find((item) => item.id === articleId) || null
@@ -919,9 +924,11 @@ async function handleApi(request, response) {
         return
       }
 
-      const matches = auth.user.notes.filter((note) => ids.includes(note.id))
+      const globalMatches = auth.user.notes.filter((note) => ids.includes(note.id))
+      const projectMatches = collectProjectNotes(auth.user).filter((note) => ids.includes(note.id))
+      const matches = [...globalMatches, ...projectMatches]
       if (!matches.length) {
-        sendJson(response, 404, { message: '没有找到要处理的常用文件。' })
+        sendJson(response, 404, { message: '没有找到要处理的文件。' })
         return
       }
 
@@ -932,12 +939,25 @@ async function handleApi(request, response) {
           }
         }
         auth.user.notes = applyNoteAction(auth.user.notes, action, ids)
+        for (const project of auth.user.projects) {
+          const nextNotes = applyNoteAction(project.notes || [], action, ids)
+          if (nextNotes !== project.notes) {
+            project.notes = nextNotes
+            project.updatedAt = new Date().toISOString()
+          }
+        }
       } else {
         applyNoteAction(auth.user.notes, action, ids)
+        for (const project of auth.user.projects) {
+          if ((project.notes || []).some((note) => ids.includes(note.id))) {
+            applyNoteAction(project.notes, action, ids)
+            project.updatedAt = new Date().toISOString()
+          }
+        }
       }
 
       await writeDb(auth.db)
-      sendJson(response, 200, { notes: auth.user.notes })
+      sendJson(response, 200, { notes: auth.user.notes, projects: auth.user.projects })
     } catch {
       sendJson(response, 400, { message: '批量操作失败。' })
     }
@@ -1164,24 +1184,18 @@ async function handleApi(request, response) {
         return
       }
 
-      if (action !== 'remove' || !ids.length) {
+      if (action !== 'trash' || !ids.length) {
         sendJson(response, 400, { message: 'Invalid project batch action.' })
         return
       }
 
       const idSet = new Set(ids)
-      const nextNotes = project.notes.filter((note) => !idSet.has(note.id))
-      if (nextNotes.length === project.notes.length) {
+      if (!project.notes.some((note) => idSet.has(note.id) && !note.deletedAt)) {
         sendJson(response, 404, { message: 'No matching project files were found.' })
         return
       }
 
-      const removedNotes = project.notes.filter((note) => idSet.has(note.id))
-      for (const note of removedNotes) {
-        await removeUploadFile(note)
-      }
-
-      project.notes = nextNotes
+      applyNoteAction(project.notes, action, ids)
       project.updatedAt = new Date().toISOString()
       await writeDb(auth.db)
       sendJson(response, 200, { project, projects: auth.user.projects })
