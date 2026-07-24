@@ -555,27 +555,101 @@ function LoginScreen({
   onCredentialChange,
   onSubmit,
 }) {
+  const authTitle = authMode === 'login' ? '欢迎回来' : '创建你的工作空间'
+  const authSubtitle =
+    authMode === 'login'
+      ? '登录后即可继续管理资料、项目文件夹、写作内容与回收记录。'
+      : '注册后会立即创建独立账号空间，你的资料与项目会持续保存到服务器。'
+
   return (
     <main className="login-shell">
       <section className="login-panel card">
         <div className="login-copy">
-          <p className="eyebrow">火焰笔记</p>
-          <h1>先登录，再进入你的项目与常用文件空间</h1>
-          <p className="intro">登录后可管理常用文件、项目内文件和文件夹结构，数据会跟随账号永久保存到服务器。</p>
+          <div className="login-brand-row">
+            <p className="eyebrow">翎羽晨风 · FireWebsite</p>
+            <span className="login-badge">多模块资料工作台</span>
+          </div>
+          <div className="login-illustration" aria-hidden="true">
+            <div className="illustration-sun" />
+            <div className="illustration-cloud cloud-left" />
+            <div className="illustration-cloud cloud-right" />
+            <div className="illustration-hill hill-back" />
+            <div className="illustration-hill hill-front" />
+            <div className="illustration-desk" />
+            <div className="illustration-laptop">
+              <div className="laptop-screen">
+                <span className="screen-dot dot-orange" />
+                <span className="screen-dot dot-blue" />
+                <span className="screen-dot dot-gold" />
+              </div>
+            </div>
+            <div className="illustration-book book-left" />
+            <div className="illustration-book book-right" />
+            <div className="illustration-mug" />
+            <div className="illustration-mascot">
+              <div className="mascot-hair" />
+              <div className="mascot-face">
+                <span className="mascot-eye left-eye" />
+                <span className="mascot-eye right-eye" />
+                <span className="mascot-smile" />
+              </div>
+              <div className="mascot-body" />
+            </div>
+          </div>
+          <div className="login-copy-text">
+            <h1>欢迎回来</h1>
+            <p className="intro">登录后即可继续整理资料、维护项目空间、写内容和管理附件。</p>
+          </div>
           <div className="status-strip">
-            <span className="status-pill status-pill-strong">独立登录页</span>
-            <span className="status-pill">项目管理页</span>
-            <span className="status-pill">文件夹上传</span>
+            <span className="status-pill status-pill-strong">资料集中管理</span>
+            <span className="status-pill">项目文件夹归档</span>
+            <span className="status-pill">内容创作与附件</span>
+          </div>
+
+          <div className="login-metric-grid">
+            <article className="login-metric-card">
+              <strong>6 大模块</strong>
+              <span>资料、项目、写作、回收记录一体化切换</span>
+            </article>
+            <article className="login-metric-card">
+              <strong>文件夹直传</strong>
+              <span>自动保留原始层级，更适合长期归档</span>
+            </article>
+            <article className="login-metric-card">
+              <strong>服务端持久化</strong>
+              <span>重新登录后仍可继续处理上次内容</span>
+            </article>
+          </div>
+
+          <div className="login-feature-list">
+            <div className="login-feature-item">
+              <strong>资料中心</strong>
+              <span>支持单文件、整文件夹上传、预览、批量下载和删除。</span>
+            </div>
+            <div className="login-feature-item">
+              <strong>项目空间</strong>
+              <span>每个项目独立管理文件与目录结构，适合持续迭代。</span>
+            </div>
+            <div className="login-feature-item">
+              <strong>内容创作</strong>
+              <span>写作时可直接调整正文样式，并同步预览与自动保存。</span>
+            </div>
           </div>
         </div>
 
         <div className="login-card">
+          <div className="login-card-head">
+            <p className="eyebrow">账号入口</p>
+            <h2>{authTitle}</h2>
+            <p>{authSubtitle}</p>
+          </div>
+
           <div className="auth-tabs">
             <button className={authMode === 'login' ? 'is-active' : ''} type="button" onClick={() => onModeChange('login')}>
-              登录
+              账号登录
             </button>
             <button className={authMode === 'register' ? 'is-active' : ''} type="button" onClick={() => onModeChange('register')}>
-              注册
+              创建账号
             </button>
           </div>
 
@@ -585,7 +659,7 @@ function LoginScreen({
               <input
                 value={credentials.username}
                 onChange={(event) => onCredentialChange('username', event.target.value)}
-                placeholder="至少 3 位"
+                placeholder="请输入用户名，至少 3 位"
                 autoComplete="username"
               />
             </label>
@@ -596,17 +670,22 @@ function LoginScreen({
                 type="password"
                 value={credentials.password}
                 onChange={(event) => onCredentialChange('password', event.target.value)}
-                placeholder="至少 6 位"
+                placeholder="请输入密码，至少 6 位"
                 autoComplete={authMode === 'login' ? 'current-password' : 'new-password'}
               />
             </label>
 
             <div className="auth-actions">
               <button className="button button-primary" type="submit" disabled={isSubmittingAuth || isBooting}>
-                {isSubmittingAuth ? '提交中...' : authMode === 'login' ? '登录账号' : '创建账号'}
+                {isSubmittingAuth ? '提交中...' : authMode === 'login' ? '进入工作台' : '立即创建并进入'}
               </button>
             </div>
           </form>
+
+          <div className="login-helper-row">
+            <span>建议使用你常用的账号名，后续项目与资料都会与该账号绑定。</span>
+            <span>{authMode === 'login' ? '已有内容会自动恢复。' : '注册成功后会直接进入站点。'}</span>
+          </div>
 
           <div className="auth-message">{isBooting ? '正在恢复登录状态...' : authMessage}</div>
         </div>
