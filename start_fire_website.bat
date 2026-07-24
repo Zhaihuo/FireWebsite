@@ -6,7 +6,7 @@ cd /d "%~dp0"
 set "PORT=3100"
 set "URL=http://localhost:%PORT%/"
 set "LAN_IP="
-for /f "usebackq delims=" %%I in (`powershell -NoProfile -Command "(Get-NetIPAddress -AddressFamily IPv4 | Where-Object { $_.IPAddress -notlike '127.*' -and $_.IPAddress -notlike '169.254.*' -and $_.PrefixOrigin -ne 'WellKnown' } | Sort-Object InterfaceMetric | Select-Object -First 1 -ExpandProperty IPAddress)"`) do set "LAN_IP=%%I"
+for /f "usebackq delims=" %%I in (`powershell -NoProfile -Command "$udp = New-Object System.Net.Sockets.UdpClient; $udp.Connect('8.8.8.8', 80); $ip = $udp.Client.LocalEndPoint.Address.IPAddressToString; $udp.Close(); $ip"`) do set "LAN_IP=%%I"
 if defined LAN_IP (
   set "LAN_URL=http://%LAN_IP%:%PORT%/"
 ) else (
@@ -14,7 +14,7 @@ if defined LAN_IP (
 )
 
 echo.
-echo [1/5] Checking Node.js...
+echo [1/6] Checking Node.js...
 where node >nul 2>nul
 if errorlevel 1 (
   echo Node.js is not installed or not in PATH.
@@ -24,7 +24,7 @@ if errorlevel 1 (
 )
 
 echo.
-echo [2/5] Checking dependencies...
+echo [2/6] Checking dependencies...
 if not exist "node_modules" (
   echo node_modules not found. Installing dependencies...
   call npm.cmd install
@@ -36,7 +36,14 @@ if not exist "node_modules" (
 )
 
 echo.
-echo [3/5] Building frontend...
+echo [3/6] Stopping any old server using port %PORT%...
+for /f "usebackq delims=" %%P in (`powershell -NoProfile -Command "$conn = Get-NetTCPConnection -LocalPort %PORT% -State Listen -ErrorAction SilentlyContinue | Select-Object -First 1 -ExpandProperty OwningProcess; if ($conn) { $conn }"`) do (
+  echo Found old process %%P on port %PORT%. Stopping it...
+  taskkill /PID %%P /T /F >nul 2>nul
+)
+
+echo.
+echo [4/6] Building frontend...
 call npm.cmd run build
 if errorlevel 1 (
   echo Frontend build failed.
@@ -45,17 +52,11 @@ if errorlevel 1 (
 )
 
 echo.
-echo [4/5] Starting backend server on port %PORT%...
-start "FireWebsite Server" cmd /k "cd /d "%~dp0" && set PORT=%PORT% && npm.cmd start"
+echo [5/6] Opening website...
+start "" powershell -NoProfile -WindowStyle Hidden -Command "Start-Sleep -Seconds 2; Start-Process '%URL%'"
 
 echo.
-echo Waiting for server to start...
-timeout /t 3 /nobreak >nul
-
-echo.
-echo [5/5] Opening website...
-start "" "%URL%"
-
+echo [6/6] Starting local server on port %PORT%...
 echo.
 echo FireWebsite is starting.
 echo Open this address if the browser did not open automatically:
@@ -67,8 +68,9 @@ if defined LAN_URL (
 )
 echo.
 echo Tips:
-echo - Keep the "FireWebsite Server" window open while using the site.
-echo - Close that window to stop the backend service.
+echo - Keep this window open while using the site.
+echo - Closing this window will stop the local website server.
 if defined LAN_URL echo - If another computer cannot open the site, allow Node.js or port %PORT% through Windows Firewall.
 echo.
-pause
+set "PORT=%PORT%"
+node server.mjs

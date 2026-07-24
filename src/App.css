@@ -48,6 +48,12 @@
   --page-accent: #4b8e2e;
 }
 
+.page-writing {
+  --page-hero-bg: url('/backgrounds/page-backend.svg');
+  --page-section-bg: url('/backgrounds/page-frontend.svg');
+  --page-accent: #d3542b;
+}
+
 .page-projects {
   --page-hero-bg: url('/backgrounds/page-projects.svg');
   --page-section-bg: url('/backgrounds/page-projects.svg');
@@ -330,6 +336,13 @@ h1 {
   font-size: 1.35rem;
 }
 
+.build-stamp {
+  margin-top: 4px;
+  color: var(--text-soft);
+  font-size: 0.78rem;
+  letter-spacing: 0.04em;
+}
+
 .topbar-nav {
   display: flex;
   flex-wrap: wrap;
@@ -472,6 +485,310 @@ h1 {
 .trash-grid {
   display: grid;
   gap: 14px;
+}
+
+.folder-sections {
+  display: grid;
+  gap: 18px;
+}
+
+.folder-tree {
+  display: grid;
+  gap: 18px;
+}
+
+.folder-section {
+  padding: 18px;
+  border-radius: 20px;
+  border: 1px solid color-mix(in srgb, var(--page-accent) 16%, white);
+  background:
+    linear-gradient(rgba(255, 255, 255, 0.82), rgba(255, 255, 255, 0.9)),
+    url('/backgrounds/card-steel.svg') center / cover no-repeat;
+  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.08);
+}
+
+.folder-section-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: baseline;
+  margin-bottom: 14px;
+}
+
+.folder-section-head h3,
+.folder-section-head span,
+.folder-section-kicker {
+  color: var(--text-main);
+}
+
+.folder-section-kicker {
+  margin-bottom: 6px;
+  font-size: 0.8rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--page-accent);
+}
+
+.folder-tree-branch {
+  margin-left: calc(var(--folder-depth, 0) * 18px);
+}
+
+.folder-toggle {
+  width: 100%;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+}
+
+.folder-toggle span {
+  white-space: nowrap;
+}
+
+.folder-tree-children {
+  display: grid;
+  gap: 14px;
+  margin-top: 12px;
+}
+
+.card-lite {
+  padding: 20px;
+  border-radius: 22px;
+  border: 1px solid var(--line);
+  background:
+    linear-gradient(rgba(255, 255, 255, 0.86), rgba(255, 255, 255, 0.93)),
+    url('/backgrounds/card-coral.svg') center / cover no-repeat;
+  box-shadow: 0 12px 28px rgba(15, 23, 42, 0.08);
+}
+
+.section-writing {
+  background-image:
+    linear-gradient(rgba(255, 255, 255, 0.9), rgba(255, 255, 255, 0.94)),
+    url('/backgrounds/page-projects.svg');
+}
+
+.writing-layout {
+  display: grid;
+  grid-template-columns: 320px minmax(0, 1fr);
+  gap: 18px;
+}
+
+.writing-sidebar,
+.writing-editor {
+  display: grid;
+  gap: 16px;
+}
+
+.writing-sidebar-head,
+.writing-editor-top,
+.writing-assets-head,
+.writing-preview-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.writing-list {
+  display: grid;
+  gap: 12px;
+}
+
+.writing-card {
+  padding: 18px;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background:
+    linear-gradient(rgba(255, 255, 255, 0.82), rgba(255, 255, 255, 0.9)),
+    url('/backgrounds/card-gold.svg') center / cover no-repeat;
+  text-align: left;
+  cursor: pointer;
+  transition: transform 160ms ease, box-shadow 160ms ease, border-color 160ms ease;
+}
+
+.writing-card:hover,
+.writing-card.is-active {
+  transform: translateY(-2px);
+  border-color: color-mix(in srgb, var(--page-accent) 28%, white);
+  box-shadow: 0 16px 34px rgba(15, 23, 42, 0.12);
+}
+
+.writing-card-meta {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 10px;
+  color: var(--text-soft);
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.status-dot {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 700;
+}
+
+.status-draft {
+  color: #9a6700;
+}
+
+.status-published {
+  color: #0f8f5f;
+}
+
+.writing-card h3 {
+  margin-bottom: 8px;
+}
+
+.writing-card p {
+  color: var(--text-soft);
+  line-height: 1.6;
+}
+
+.writing-card-main {
+  display: grid;
+  gap: 8px;
+  width: 100%;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+}
+
+.writing-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.writing-cover {
+  display: grid;
+  grid-template-columns: minmax(220px, 0.8fr) minmax(0, 1fr);
+  gap: 16px;
+}
+
+.writing-cover-preview {
+  min-height: 220px;
+  border-radius: 18px;
+  overflow: hidden;
+  background:
+    linear-gradient(135deg, rgba(216, 75, 42, 0.18), rgba(12, 153, 187, 0.18)),
+    #f8fafc;
+}
+
+.writing-cover-preview img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.cover-placeholder {
+  display: grid;
+  place-items: center;
+  width: 100%;
+  height: 100%;
+  color: var(--text-soft);
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.writing-cover-fields,
+.writing-form-grid,
+.writing-field {
+  display: grid;
+  gap: 10px;
+}
+
+.writing-title-input {
+  font-size: 2rem;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+}
+
+.writing-chip-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.writing-compose-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.15fr) minmax(300px, 0.85fr);
+  gap: 18px;
+  align-items: start;
+}
+
+.writing-editor-textarea {
+  min-height: 520px;
+  resize: vertical;
+  line-height: 1.75;
+}
+
+.writing-preview {
+  display: grid;
+  gap: 16px;
+}
+
+.writing-preview-summary {
+  font-size: 1rem;
+  line-height: 1.7;
+  color: var(--text-soft);
+}
+
+.writing-preview-body {
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-family: "Consolas", "Courier New", monospace;
+  line-height: 1.8;
+  color: var(--text-main);
+}
+
+.writing-attachment-list {
+  display: grid;
+  gap: 10px;
+}
+
+.writing-attachment-item {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 12px;
+  padding: 14px 16px;
+  border-radius: 16px;
+  color: var(--text-main);
+  background: rgba(255, 255, 255, 0.88);
+  box-shadow: inset 0 0 0 1px var(--line);
+}
+
+.writing-attachment-main {
+  display: grid;
+  gap: 6px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+}
+
+.writing-attachment-item span {
+  color: var(--text-soft);
+}
+
+.writing-attachment-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.writing-search-box,
+.cover-upload-zone {
+  min-height: auto;
 }
 
 .blog-post-card {

@@ -32,6 +32,9 @@ const profile = {
   status: '当前站点支持登录、常用文件、项目管理、垃圾管理、文件夹上传和服务端永久保存。',
 }
 
+const APP_VERSION = typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : 'dev'
+const APP_BUILD_TIME = typeof __APP_BUILD_TIME__ !== 'undefined' ? __APP_BUILD_TIME__ : new Date().toISOString()
+
 const frontendPosts = [
   {
     title: '前端展示页：多页面工作台',
@@ -75,6 +78,31 @@ const formatLabels = {
   file: '文件',
 }
 
+const beijingTimeFormatter = new Intl.DateTimeFormat('zh-CN', {
+  timeZone: 'Asia/Shanghai',
+  year: 'numeric',
+  month: '2-digit',
+  day: '2-digit',
+  hour: '2-digit',
+  minute: '2-digit',
+  hour12: false,
+})
+
+function formatBeijingTime(value) {
+  if (!value) return '未知'
+
+  const normalized = String(value).trim()
+  if (!normalized) return '未知'
+
+  const parsed = new Date(normalized)
+  if (!Number.isNaN(parsed.getTime())) {
+    return beijingTimeFormatter.format(parsed)
+  }
+
+  return normalized
+}
+
+
 const pageMeta = {
   frontend: {
     eyebrow: 'Frontend',
@@ -91,6 +119,11 @@ const pageMeta = {
     title: '常用文件区',
     description: '上传文件、上传文件夹、搜索内容并进行批量管理。',
   },
+  writing: {
+    eyebrow: 'Note Studio',
+    title: '笔记管理',
+    description: '像博客后台一样管理笔记，支持标题、摘要、正文、封面、标签与附件。',
+  },
   projects: {
     eyebrow: 'Projects',
     title: '项目管理区',
@@ -101,6 +134,29 @@ const pageMeta = {
     title: '垃圾管理区',
     description: '恢复已删除常用文件，或进行最终彻底删除。',
   },
+}
+
+function createEmptyArticle() {
+  return {
+    id: '',
+    title: '',
+    summary: '',
+    content: '',
+    coverImage: '',
+    tags: [],
+    attachments: [],
+    status: 'draft',
+    createdAt: '',
+    updatedAt: '',
+  }
+}
+
+function parseTagInput(value) {
+  return String(value || '')
+    .split(/[,\n，]/)
+    .map((item) => item.trim())
+    .filter(Boolean)
+    .slice(0, 12)
 }
 
 function getExtension(fileName) {
@@ -178,13 +234,7 @@ function buildDocumentSummary(file, type) {
 
 async function createNoteFromFile(file) {
   const type = getFileType(file)
-  const createdAt = new Intl.DateTimeFormat('zh-CN', {
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-  }).format(new Date())
+  const createdAt = formatBeijingTime(new Date().toISOString())
 
   const baseNote = {
     id: `${file.name}-${file.lastModified}`,
@@ -253,9 +303,27 @@ function downloadNote(note) {
   window.setTimeout(() => URL.revokeObjectURL(url), 800)
 }
 
+function buildArticleDownloadContent(article) {
+  const tagsLine = Array.isArray(article.tags) && article.tags.length ? `Tags: ${article.tags.join(', ')}` : 'Tags:'
+  const summaryLine = article.summary ? `Summary:\n${article.summary}` : 'Summary:'
+  const contentLine = article.content ? `Content:\n${article.content}` : 'Content:'
+
+  return [`# ${article.title || 'Untitled Note'}`, tagsLine, '', summaryLine, '', contentLine].join('\n')
+}
+
+function downloadArticle(article) {
+  const blob = new Blob([buildArticleDownloadContent(article)], { type: 'text/markdown;charset=utf-8' })
+  const url = URL.createObjectURL(blob)
+  const fileName = `${(article.title || 'untitled-note').replace(/[\\/:*?"<>|]+/g, '-').slice(0, 80) || 'untitled-note'}.md`
+  triggerFileDownload(fileName, url)
+  window.setTimeout(() => URL.revokeObjectURL(url), 800)
+}
+
 async function apiFetch(path, options = {}, token = null) {
   const headers = new Headers(options.headers || {})
-  headers.set('Content-Type', 'application/json')
+  if (!(options.body instanceof FormData)) {
+    headers.set('Content-Type', 'application/json')
+  }
   if (token) headers.set('Authorization', `Bearer ${token}`)
 
   const response = await fetch(path, {
@@ -267,10 +335,65 @@ async function apiFetch(path, options = {}, token = null) {
   const data = text ? JSON.parse(text) : {}
 
   if (!response.ok) {
-    throw new Error(data.message || '请求失败，请稍后重试。')
+    throw new Error(data.message || '???????????')
   }
 
   return data
+}
+
+function buildUploadFormData(file, extraFields = {}) {
+  const formData = new FormData()
+  formData.append('file', file, file.name)
+  formData.append('relativePath', getRelativePath(file))
+  formData.append('folderPath', getFolderPath(file))
+
+  for (const [key, value] of Object.entries(extraFields)) {
+    formData.append(key, String(value))
+  }
+
+  return formData
+}
+
+function createFolderNode(name, fullPath = '') {
+  return {
+    name,
+    fullPath,
+    folders: new Map(),
+    files: [],
+  }
+}
+
+function buildFolderTree(notes) {
+  const root = createFolderNode('Root Files')
+
+  for (const note of notes) {
+    const relativePath = String(note.relativePath || '').replace(/\\/g, '/')
+    const parts = relativePath.split('/').filter(Boolean)
+    const folderParts = parts.length > 1 ? parts.slice(0, -1) : String(note.folderPath || '').replace(/\\/g, '/').split('/').filter(Boolean)
+    let current = root
+
+    for (const folderName of folderParts) {
+      const nextPath = current.fullPath ? `${current.fullPath}/${folderName}` : folderName
+      if (!current.folders.has(folderName)) {
+        current.folders.set(folderName, createFolderNode(folderName, nextPath))
+      }
+      current = current.folders.get(folderName)
+    }
+
+    current.files.push(note)
+  }
+
+  function finalize(node) {
+    return {
+      ...node,
+      folders: Array.from(node.folders.values())
+        .map(finalize)
+        .sort((left, right) => left.name.localeCompare(right.name)),
+      files: [...node.files].sort((left, right) => String(left.title || '').localeCompare(String(right.title || ''))),
+    }
+  }
+
+  return finalize(root)
 }
 
 function SelectionCheckbox({ checked, onChange, label }) {
@@ -397,7 +520,7 @@ function NoteCard({ note, isSelected = false, selectable = false, onToggleSelect
         </div>
 
         <h3>{note.title}</h3>
-        <p className="note-meta">{note.createdAt}</p>
+        <p className="note-meta">{formatBeijingTime(note.createdAt)}</p>
         {note.folderPath ? <p className="note-path">文件夹：{note.folderPath}</p> : null}
 
         {note.preview ? <img className="note-image" src={note.preview} alt={note.title} /> : null}
@@ -457,7 +580,7 @@ function TrashCard({ note, isSelected, onToggleSelect, onOpen, onRestore, onDele
           <span>{note.size}</span>
         </div>
         <h3>{note.title}</h3>
-        <p className="note-meta">删除时间：{note.deletedAt || '未知'}</p>
+        <p className="note-meta">删除时间：{formatBeijingTime(note.deletedAt)}</p>
         {note.folderPath ? <p className="note-path">文件夹：{note.folderPath}</p> : null}
       </button>
 
@@ -528,7 +651,7 @@ function NoteModal({ note, onClose }) {
             <span className={`format-pill format-${note.type}`}>{formatLabels[note.type]}</span>
             <h2>{note.title}</h2>
             <p className="note-meta">
-              {note.createdAt} · {note.size}
+              {formatBeijingTime(note.createdAt)} · {note.size}
             </p>
             {note.folderPath ? <p className="note-path">文件夹：{note.folderPath}</p> : null}
           </div>
@@ -680,6 +803,116 @@ function BatchToolbar({
   )
 }
 
+function FolderTreeNode({ node, depth = 0, selectedIds, onToggleSelect, onOpenNote, onDeleteRequest = null, isRoot = false }) {
+  const [isOpen, setIsOpen] = useState(true)
+  const hasFolders = node.folders.length > 0
+  const hasFiles = node.files.length > 0
+  const isEmpty = !hasFolders && !hasFiles
+
+  if (isRoot) {
+    return (
+      <div className="folder-tree">
+        {hasFiles ? (
+          <section className="folder-section">
+            <div className="folder-section-head">
+              <div>
+                <p className="folder-section-kicker">Direct Upload</p>
+                <h3>Root Files</h3>
+              </div>
+              <span>{node.files.length} files</span>
+            </div>
+
+            <div className="notes-feed">
+              {node.files.map((note) => (
+                <NoteCard
+                  key={note.id}
+                  note={note}
+                  isSelected={selectedIds.includes(note.id)}
+                  selectable
+                  onToggleSelect={onToggleSelect}
+                  onOpen={onOpenNote}
+                  onDelete={onDeleteRequest}
+                />
+              ))}
+            </div>
+          </section>
+        ) : null}
+
+        {node.folders.map((folder) => (
+          <FolderTreeNode
+            key={folder.fullPath}
+            node={folder}
+            depth={0}
+            selectedIds={selectedIds}
+            onToggleSelect={onToggleSelect}
+            onOpenNote={onOpenNote}
+            onDeleteRequest={onDeleteRequest}
+          />
+        ))}
+      </div>
+    )
+  }
+
+  if (isEmpty) return null
+
+  return (
+    <section className="folder-section folder-tree-branch" style={{ '--folder-depth': depth }}>
+      <button className="folder-section-head folder-toggle" type="button" onClick={() => setIsOpen((current) => !current)}>
+        <div>
+          <p className="folder-section-kicker">{depth === 0 ? 'Folder Upload' : 'Subfolder'}</p>
+          <h3>{node.name}</h3>
+        </div>
+        <span>{isOpen ? 'Hide' : 'Show'} · {node.files.length + node.folders.length} items</span>
+      </button>
+
+      {isOpen ? (
+        <div className="folder-tree-children">
+          {hasFiles ? (
+            <div className="notes-feed">
+              {node.files.map((note) => (
+                <NoteCard
+                  key={note.id}
+                  note={note}
+                  isSelected={selectedIds.includes(note.id)}
+                  selectable
+                  onToggleSelect={onToggleSelect}
+                  onOpen={onOpenNote}
+                  onDelete={onDeleteRequest}
+                />
+              ))}
+            </div>
+          ) : null}
+
+          {node.folders.map((folder) => (
+            <FolderTreeNode
+              key={folder.fullPath}
+              node={folder}
+              depth={depth + 1}
+              selectedIds={selectedIds}
+              onToggleSelect={onToggleSelect}
+              onOpenNote={onOpenNote}
+              onDeleteRequest={onDeleteRequest}
+            />
+          ))}
+        </div>
+      ) : null}
+    </section>
+  )
+}
+
+function FolderNoteSections({ tree, selectedIds, onToggleSelect, onOpenNote, onDeleteRequest = null }) {
+  return (
+    <FolderTreeNode
+      node={tree}
+      isRoot
+      selectedIds={selectedIds}
+      onToggleSelect={onToggleSelect}
+      onOpenNote={onOpenNote}
+      onDeleteRequest={onDeleteRequest}
+    />
+  )
+}
+
 function UploadFolderInput({ disabled, onChange, copy, small }) {
   return (
     <label className="upload-zone folder-upload-zone">
@@ -746,6 +979,271 @@ function BackendView() {
   )
 }
 
+function WritingView({
+  articles,
+  activeArticleId,
+  articleDraft,
+  articleQuery,
+  selectedArticleIds,
+  isSavingArticle,
+  isUploadingArticleAssets,
+  serverMessage,
+  onArticleQueryChange,
+  onSelectArticle,
+  onCreateArticle,
+  onArticleFieldChange,
+  onSaveArticle,
+  onPublishArticle,
+  onDeleteArticle,
+  onToggleArticleSelect,
+  onToggleAllArticles,
+  onClearArticleSelection,
+  onBatchDownloadArticles,
+  onBatchDeleteArticles,
+  onUploadCover,
+  onUploadAttachments,
+  onOpenAttachment,
+  onDeleteAttachment,
+}) {
+  const filteredArticles = useMemo(() => {
+    const keyword = articleQuery.trim().toLowerCase()
+    if (!keyword) return articles
+
+    return articles.filter((article) =>
+      [article.title, article.summary, article.content, (article.tags || []).join(' ')]
+        .join(' ')
+        .toLowerCase()
+        .includes(keyword),
+    )
+  }, [articles, articleQuery])
+
+  const articleCountLabel = `${articles.length} notes`
+  const attachmentCount = Array.isArray(articleDraft.attachments) ? articleDraft.attachments.length : 0
+  const allSelected = filteredArticles.length > 0 && filteredArticles.every((article) => selectedArticleIds.includes(article.id))
+
+  return (
+    <section className="blog-section card section-writing">
+      <div className="section-head">
+        <div>
+          <p className="eyebrow">Note Studio</p>
+          <h2>笔记管理页</h2>
+        </div>
+        <span>Write long-form notes with a CSDN-style publishing desk.</span>
+      </div>
+
+      <div className="writing-layout">
+        <aside className="writing-sidebar">
+          <div className="writing-sidebar-head">
+            <button className="button button-primary" type="button" onClick={onCreateArticle}>
+              新建笔记
+            </button>
+            <span className="sidebar-text">{articleCountLabel}</span>
+          </div>
+
+          <label className="search-box writing-search-box">
+            <span>搜索笔记</span>
+            <input
+              type="search"
+              value={articleQuery}
+              placeholder="标题、摘要、标签、正文"
+              onChange={(event) => onArticleQueryChange(event.target.value)}
+            />
+          </label>
+
+          <BatchToolbar
+            totalCount={filteredArticles.length}
+            selectedCount={selectedArticleIds.length}
+            allSelected={allSelected}
+            onSelectAllToggle={onToggleAllArticles}
+            onClearSelection={onClearArticleSelection}
+            onDownload={onBatchDownloadArticles}
+            onPrimaryAction={onBatchDeleteArticles}
+            primaryLabel="批量删除"
+          />
+
+          <div className="writing-list">
+            {filteredArticles.map((article) => (
+              <article key={article.id} className={article.id === activeArticleId ? 'writing-card is-active' : 'writing-card'}>
+                <div className="card-select-row">
+                  <SelectionCheckbox
+                    checked={selectedArticleIds.includes(article.id)}
+                    onChange={() => onToggleArticleSelect(article.id)}
+                    label={`选择 ${article.title || 'Untitled Note'}`}
+                  />
+                </div>
+
+                <button className="writing-card-main" type="button" onClick={() => onSelectArticle(article.id)}>
+                  <div className="writing-card-meta">
+                    <span className={`status-dot status-${article.status}`}>{article.status}</span>
+                    <span>{formatBeijingTime(article.updatedAt || article.createdAt)}</span>
+                  </div>
+                  <h3>{article.title || 'Untitled Note'}</h3>
+                  <p>{article.summary || 'No summary yet. Start writing to build your article card.'}</p>
+                </button>
+              </article>
+            ))}
+
+            {!filteredArticles.length ? <div className="empty-state">还没有匹配的笔记，先新建一篇。</div> : null}
+          </div>
+        </aside>
+
+        <div className="writing-editor">
+          <div className="writing-editor-top">
+            <div>
+              <p className="eyebrow">Editor</p>
+              <h3>{articleDraft.id ? '文章编辑中' : '新建文章'}</h3>
+            </div>
+
+            <div className="writing-actions">
+              <button className="small-action" type="button" onClick={onSaveArticle} disabled={isSavingArticle}>
+                {isSavingArticle ? '保存中...' : '保存草稿'}
+              </button>
+              <button className="small-action danger-action" type="button" onClick={onPublishArticle} disabled={isSavingArticle}>
+                发布
+              </button>
+              <button className="small-action" type="button" onClick={onDeleteArticle} disabled={!articleDraft.id || isSavingArticle}>
+                删除
+              </button>
+            </div>
+          </div>
+
+          <div className="writing-cover card-lite">
+            <div className="writing-cover-preview">
+              {articleDraft.coverImage ? <img src={articleDraft.coverImage} alt={articleDraft.title || 'cover'} /> : <div className="cover-placeholder">Cover Preview</div>}
+            </div>
+            <div className="writing-cover-fields">
+              <label>
+                <span>封面图地址</span>
+                <input
+                  value={articleDraft.coverImage}
+                  placeholder="https://..."
+                  onChange={(event) => onArticleFieldChange('coverImage', event.target.value)}
+                />
+              </label>
+              <label className="upload-zone cover-upload-zone">
+                <input type="file" accept="image/*" onChange={onUploadCover} />
+                <span className="upload-icon">+</span>
+                <span className="upload-copy">
+                  <strong>上传封面</strong>
+                  <small>支持本地图片直接作为封面</small>
+                </span>
+              </label>
+            </div>
+          </div>
+
+          <div className="writing-form-grid">
+            <label className="writing-field writing-title-field">
+              <span>标题</span>
+              <input
+                className="writing-title-input"
+                value={articleDraft.title}
+                placeholder="请输入一篇像博客文章一样的标题"
+                onChange={(event) => onArticleFieldChange('title', event.target.value)}
+              />
+            </label>
+
+            <label className="writing-field">
+              <span>摘要</span>
+              <textarea
+                value={articleDraft.summary}
+                rows={4}
+                placeholder="用 2-4 句话概括这篇笔记想表达什么"
+                onChange={(event) => onArticleFieldChange('summary', event.target.value)}
+              />
+            </label>
+
+            <label className="writing-field">
+              <span>标签</span>
+              <input
+                value={(articleDraft.tags || []).join(', ')}
+                placeholder="前端, React, 项目总结"
+                onChange={(event) => onArticleFieldChange('tags', parseTagInput(event.target.value))}
+              />
+            </label>
+
+            <div className="writing-chip-row">
+              {(articleDraft.tags || []).map((tag) => (
+                <span key={tag} className="tag">
+                  {tag}
+                </span>
+              ))}
+            </div>
+          </div>
+
+          <div className="writing-compose-grid">
+            <label className="writing-field">
+              <span>正文</span>
+              <textarea
+                className="writing-editor-textarea"
+                value={articleDraft.content}
+                rows={18}
+                placeholder="像写博客一样输入正文，可记录方案、过程、经验和结果。"
+                onChange={(event) => onArticleFieldChange('content', event.target.value)}
+              />
+            </label>
+
+            <section className="writing-preview card-lite">
+              <div className="writing-preview-head">
+                <p className="eyebrow">Live Preview</p>
+                <span>{articleDraft.status}</span>
+              </div>
+              <h2>{articleDraft.title || '未命名笔记'}</h2>
+              <p className="writing-preview-summary">{articleDraft.summary || '这里会显示文章摘要。'}</p>
+              <pre className="writing-preview-body">{articleDraft.content || '这里会实时预览正文内容。'}</pre>
+            </section>
+          </div>
+
+          <section className="writing-assets card-lite">
+            <div className="writing-assets-head">
+              <div>
+                <p className="eyebrow">Attachments</p>
+                <h3>附件素材</h3>
+              </div>
+              <span>{attachmentCount} files</span>
+            </div>
+
+            <label className="upload-zone">
+              <input type="file" multiple disabled={isUploadingArticleAssets} onChange={onUploadAttachments} />
+              <span className="upload-icon">+</span>
+              <span className="upload-copy">
+                <strong>{isUploadingArticleAssets ? '上传附件中...' : '上传附件到当前笔记'}</strong>
+                <small>支持图片、文档、表格、压缩包等素材</small>
+              </span>
+            </label>
+
+            <div className="writing-attachment-list">
+              {(articleDraft.attachments || []).map((attachment) => (
+                <div key={attachment.id} className="writing-attachment-item">
+                  <button className="writing-attachment-main" type="button" onClick={() => onOpenAttachment(attachment)}>
+                    <strong>{attachment.title}</strong>
+                    <span>{attachment.size}</span>
+                  </button>
+                  <div className="writing-attachment-actions">
+                    <button className="small-action" type="button" onClick={() => onOpenAttachment(attachment)}>
+                      预览
+                    </button>
+                    <button className="small-action danger-action" type="button" onClick={() => onDeleteAttachment(attachment)}>
+                      删除
+                    </button>
+                  </div>
+                </div>
+              ))}
+
+              {!attachmentCount ? <div className="empty-state">保存文章后即可上传附件，适合挂设计稿、PDF、表格和截图。</div> : null}
+            </div>
+          </section>
+
+          <div className="note-stats">
+            <span>{serverMessage}</span>
+            <span>状态：{articleDraft.status}</span>
+            <span>更新时间：{formatBeijingTime(articleDraft.updatedAt || articleDraft.createdAt)}</span>
+          </div>
+        </div>
+      </div>
+    </section>
+  )
+}
+
 function NotesView({
   activeNotes,
   filteredNotes,
@@ -765,6 +1263,7 @@ function NotesView({
   onBatchDelete,
 }) {
   const allSelected = filteredNotes.length > 0 && filteredNotes.every((note) => selectedIds.includes(note.id))
+  const folderTree = useMemo(() => buildFolderTree(filteredNotes), [filteredNotes])
 
   return (
     <section className="blog-section card section-notes">
@@ -820,19 +1319,13 @@ function NotesView({
         <span>{serverMessage}</span>
       </div>
 
-      <div className="notes-feed">
-        {filteredNotes.map((note) => (
-          <NoteCard
-            key={note.id}
-            note={note}
-            isSelected={selectedIds.includes(note.id)}
-            selectable
-            onToggleSelect={onToggleSelect}
-            onOpen={onOpenNote}
-            onDelete={onDeleteRequest}
-          />
-        ))}
-      </div>
+      <FolderNoteSections
+        tree={folderTree}
+        selectedIds={selectedIds}
+        onToggleSelect={onToggleSelect}
+        onOpenNote={onOpenNote}
+        onDeleteRequest={onDeleteRequest}
+      />
     </section>
   )
 }
@@ -867,6 +1360,7 @@ function ProjectsView({
   const activeProject = projects.find((project) => project.id === activeProjectId) || filteredProjects[0] || null
   const activeProjectNotes = useMemo(() => activeProject?.notes || [], [activeProject])
   const allSelected = activeProjectNotes.length > 0 && activeProjectNotes.every((note) => selectedIds.includes(note.id))
+  const activeProjectTree = useMemo(() => buildFolderTree(activeProjectNotes), [activeProjectNotes])
 
   return (
     <section className="blog-section card section-projects">
@@ -952,18 +1446,12 @@ function ProjectsView({
                 primaryLabel="批量删除"
               />
 
-              <div className="notes-feed">
-                {activeProjectNotes.map((note) => (
-                  <NoteCard
-                    key={note.id}
-                    note={note}
-                    isSelected={selectedIds.includes(note.id)}
-                    selectable
-                    onToggleSelect={onToggleSelect}
-                    onOpen={onOpenNote}
-                  />
-                ))}
-              </div>
+              <FolderNoteSections
+                tree={activeProjectTree}
+                selectedIds={selectedIds}
+                onToggleSelect={onToggleSelect}
+                onOpenNote={onOpenNote}
+              />
 
               {!activeProject.notes.length ? <div className="empty-state">这个项目里还没有文件，先上传一份试试。</div> : null}
             </>
@@ -1039,6 +1527,30 @@ function TrashView({
 }
 
 function SidebarPanel({ activePage, session, activeNotes, trashedNotes, projects }) {
+  if (activePage === 'writing') {
+    return (
+      <>
+        <section className="sidebar-card card">
+          <p className="eyebrow">Studio</p>
+          <h3>博客写作台</h3>
+          <p className="sidebar-text">像 CSDN 后台一样写标题、摘要、正文、封面和附件。</p>
+          <p className="sidebar-text">当前账号：{session.username}</p>
+        </section>
+
+        <section className="sidebar-card card">
+          <p className="eyebrow">Tips</p>
+          <h3>推荐写法</h3>
+          <ul className="sidebar-list">
+            <li>标题突出主题和结果</li>
+            <li>摘要先写结论与价值</li>
+            <li>正文按问题、过程、结果展开</li>
+            <li>附件可补设计稿、文档、截图</li>
+          </ul>
+        </section>
+      </>
+    )
+  }
+
   if (activePage === 'projects') {
     return (
       <>
@@ -1119,6 +1631,11 @@ function WebsiteShell(props) {
     filteredNotes,
     trashedNotes,
     projects,
+    articles,
+    articleDraft,
+    articleQuery,
+    activeArticleId,
+    selectedArticleIds,
     selectedNoteIds,
     selectedTrashIds,
     selectedProjectNoteIds,
@@ -1128,6 +1645,8 @@ function WebsiteShell(props) {
     activeProjectId,
     isUploading,
     isUploadingProject,
+    isSavingArticle,
+    isUploadingArticleAssets,
     isDeleteWorking,
     serverMessage,
     session,
@@ -1143,6 +1662,21 @@ function WebsiteShell(props) {
     onSelectProject,
     onUpload,
     onUploadFolder,
+    onArticleQueryChange,
+    onSelectArticle,
+    onCreateArticle,
+    onArticleFieldChange,
+    onSaveArticle,
+    onPublishArticle,
+    onDeleteArticle,
+    onToggleArticleSelect,
+    onToggleAllArticles,
+    onClearArticleSelection,
+    onBatchDownloadArticles,
+    onBatchDeleteArticles,
+    onUploadCover,
+    onUploadAttachments,
+    onDeleteArticleAttachment,
     onUploadToProject,
     onUploadFolderToProject,
     onOpenNote,
@@ -1194,6 +1728,36 @@ function WebsiteShell(props) {
 
   if (activePage === 'frontend') mainView = <FrontendView />
   if (activePage === 'backend') mainView = <BackendView />
+  if (activePage === 'writing') {
+    mainView = (
+      <WritingView
+        articles={articles}
+        activeArticleId={activeArticleId}
+        articleDraft={articleDraft}
+        articleQuery={articleQuery}
+        selectedArticleIds={selectedArticleIds}
+        isSavingArticle={isSavingArticle}
+        isUploadingArticleAssets={isUploadingArticleAssets}
+        serverMessage={serverMessage}
+        onArticleQueryChange={onArticleQueryChange}
+        onSelectArticle={onSelectArticle}
+        onCreateArticle={onCreateArticle}
+        onArticleFieldChange={onArticleFieldChange}
+        onSaveArticle={onSaveArticle}
+        onPublishArticle={onPublishArticle}
+        onDeleteArticle={onDeleteArticle}
+        onToggleArticleSelect={onToggleArticleSelect}
+        onToggleAllArticles={onToggleAllArticles}
+        onClearArticleSelection={onClearArticleSelection}
+        onBatchDownloadArticles={onBatchDownloadArticles}
+        onBatchDeleteArticles={onBatchDeleteArticles}
+        onUploadCover={onUploadCover}
+        onUploadAttachments={onUploadAttachments}
+        onOpenAttachment={onOpenNote}
+        onDeleteAttachment={onDeleteArticleAttachment}
+      />
+    )
+  }
   if (activePage === 'projects') {
     mainView = (
       <ProjectsView
@@ -1247,6 +1811,7 @@ function WebsiteShell(props) {
           <div className="topbar-brand">
             <p className="eyebrow">Fire Coder Blog</p>
             <h2>{profile.name}</h2>
+            <p className="build-stamp">v{APP_VERSION} ? built {formatBeijingTime(APP_BUILD_TIME)}</p>
           </div>
 
           <nav className="topbar-nav" aria-label="主导航">
@@ -1300,6 +1865,11 @@ function App() {
   const [session, setSession] = useState(null)
   const [notes, setNotes] = useState([])
   const [projects, setProjects] = useState([])
+  const [articles, setArticles] = useState([])
+  const [articleQuery, setArticleQuery] = useState('')
+  const [activeArticleId, setActiveArticleId] = useState('')
+  const [articleDraft, setArticleDraft] = useState(createEmptyArticle())
+  const [isCreatingArticle, setIsCreatingArticle] = useState(false)
   const [query, setQuery] = useState('')
   const [projectQuery, setProjectQuery] = useState('')
   const [projectName, setProjectName] = useState('')
@@ -1310,10 +1880,13 @@ function App() {
   const [selectedNoteIds, setSelectedNoteIds] = useState([])
   const [selectedTrashIds, setSelectedTrashIds] = useState([])
   const [selectedProjectNoteIds, setSelectedProjectNoteIds] = useState([])
+  const [selectedArticleIds, setSelectedArticleIds] = useState([])
   const [isBooting, setIsBooting] = useState(true)
   const [isSubmittingAuth, setIsSubmittingAuth] = useState(false)
   const [isUploading, setIsUploading] = useState(false)
   const [isUploadingProject, setIsUploadingProject] = useState(false)
+  const [isSavingArticle, setIsSavingArticle] = useState(false)
+  const [isUploadingArticleAssets, setIsUploadingArticleAssets] = useState(false)
   const [isDeleteWorking, setIsDeleteWorking] = useState(false)
   const [authMessage, setAuthMessage] = useState('注册后即可把内容永久保存到服务器。')
   const [serverMessage, setServerMessage] = useState('服务端存储已启用。')
@@ -1324,7 +1897,11 @@ function App() {
     setSession(data.user)
     setNotes(Array.isArray(data.notes) ? data.notes : [])
     const nextProjects = Array.isArray(data.projects) ? data.projects : []
+    const nextArticles = Array.isArray(data.articles) ? data.articles : []
     setProjects(nextProjects)
+    setArticles(nextArticles)
+    setActiveArticleId(nextArticles[0]?.id || '')
+    setArticleDraft(nextArticles[0] || createEmptyArticle())
     setActiveProjectId(nextProjects[0]?.id || '')
     setServerMessage('已从服务端加载你的常用文件和项目。')
   }
@@ -1363,6 +1940,10 @@ function App() {
     [projects, activeProjectId],
   )
   const activeProjectNotes = useMemo(() => activeProject?.notes || [], [activeProject])
+  const activeArticle = useMemo(
+    () => articles.find((article) => article.id === activeArticleId) || articles[0] || null,
+    [articles, activeArticleId],
+  )
 
   useEffect(() => {
     setSelectedNoteIds((current) => current.filter((id) => filteredNotes.some((note) => note.id === id)))
@@ -1377,6 +1958,10 @@ function App() {
   }, [activeProjectNotes])
 
   useEffect(() => {
+    setSelectedArticleIds((current) => current.filter((id) => articles.some((article) => article.id === id)))
+  }, [articles])
+
+  useEffect(() => {
     if (projects.length && !projects.some((project) => project.id === activeProjectId)) {
       setActiveProjectId(projects[0].id)
     }
@@ -1384,6 +1969,28 @@ function App() {
       setActiveProjectId('')
     }
   }, [projects, activeProjectId])
+
+  useEffect(() => {
+    if (activeArticleId && articles.length && !articles.some((article) => article.id === activeArticleId)) {
+      setActiveArticleId(articles[0].id)
+      setArticleDraft(articles[0])
+      setIsCreatingArticle(false)
+      return
+    }
+
+    if (!articles.length && activeArticleId) {
+      setActiveArticleId('')
+      setArticleDraft(createEmptyArticle())
+      setIsCreatingArticle(true)
+    }
+  }, [articles, activeArticleId])
+
+  useEffect(() => {
+    if (activeArticleId && activeArticle) {
+      setArticleDraft(activeArticle)
+      setIsCreatingArticle(false)
+    }
+  }, [activeArticle, activeArticleId])
 
   function updateCredential(key, value) {
     setCredentials((current) => ({ ...current, [key]: value }))
@@ -1432,8 +2039,13 @@ function App() {
       setSession(data.user)
       setNotes(Array.isArray(data.notes) ? data.notes : [])
       const nextProjects = Array.isArray(data.projects) ? data.projects : []
+      const nextArticles = Array.isArray(data.articles) ? data.articles : []
       setProjects(nextProjects)
+      setArticles(nextArticles)
+      setActiveArticleId(nextArticles[0]?.id || '')
+      setArticleDraft(nextArticles[0] || createEmptyArticle())
       setSelectedProjectNoteIds([])
+      setSelectedArticleIds([])
       setActiveProjectId(nextProjects[0]?.id || '')
       setSelectedNoteIds([])
       setSelectedTrashIds([])
@@ -1464,6 +2076,10 @@ function App() {
     setSession(null)
     setNotes([])
     setProjects([])
+    setArticles([])
+    setArticleQuery('')
+    setActiveArticleId('')
+    setArticleDraft(createEmptyArticle())
     setQuery('')
     setProjectQuery('')
     setProjectName('')
@@ -1474,33 +2090,221 @@ function App() {
     setSelectedNoteIds([])
     setSelectedTrashIds([])
     setSelectedProjectNoteIds([])
+    setSelectedArticleIds([])
     setAuthMode('login')
     setAuthMessage('你已退出登录，请重新登录。')
     setServerMessage('服务端存储已启用。')
+  }
+
+  function handleCreateArticle() {
+    setActiveArticleId('')
+    setArticleDraft(createEmptyArticle())
+    setIsCreatingArticle(true)
+    setActivePage('writing')
+    setServerMessage('A fresh note draft is ready.')
+  }
+
+  function handleSelectArticle(articleId) {
+    const nextArticle = articles.find((article) => article.id === articleId)
+    if (!nextArticle) return
+    setActiveArticleId(articleId)
+    setArticleDraft(nextArticle)
+    setIsCreatingArticle(false)
+    setActivePage('writing')
+  }
+
+  function handleArticleFieldChange(field, value) {
+    setArticleDraft((current) => ({ ...current, [field]: value }))
+  }
+
+  async function saveArticleWithStatus(status = 'draft') {
+    if (!token) return null
+
+    setIsSavingArticle(true)
+
+    try {
+      const data = await apiFetch(
+        '/api/articles/save',
+        {
+          method: 'POST',
+          body: JSON.stringify({
+            article: {
+              ...articleDraft,
+              status,
+            },
+          }),
+        },
+        token,
+      )
+
+      const nextArticles = Array.isArray(data.articles) ? data.articles : articles
+      const savedArticle = data.article || nextArticles.find((article) => article.id === articleDraft.id) || articleDraft
+      setArticles(nextArticles)
+      setActiveArticleId(savedArticle.id || '')
+      setArticleDraft(savedArticle)
+      setIsCreatingArticle(false)
+      setActivePage('writing')
+      setServerMessage(status === 'published' ? 'Article published successfully.' : 'Draft saved successfully.')
+      return savedArticle
+    } catch (error) {
+      setServerMessage(error instanceof Error ? error.message : 'Unable to save the note article.')
+      return null
+    } finally {
+      setIsSavingArticle(false)
+    }
+  }
+
+  async function handleDeleteArticle() {
+    if (!articleDraft.id) return
+    openScopedBatchConfirm(
+      'articles',
+      'remove',
+      [articleDraft.id],
+      '删除笔记',
+      '确认删除',
+      `确认删除“${articleDraft.title || 'Untitled Note'}”吗？删除后无法恢复，附件也会一起删除。`,
+    )
+  }
+
+  async function handleUploadArticleCover(event) {
+    const file = event.target.files?.[0]
+    if (!file) return
+
+    try {
+      const coverImage = await readFileAsDataUrl(file)
+      setArticleDraft((current) => ({ ...current, coverImage }))
+      setServerMessage('Cover image loaded into the editor.')
+    } catch {
+      setServerMessage('Unable to read the cover image.')
+    } finally {
+      event.target.value = ''
+    }
+  }
+
+  async function handleUploadArticleAttachments(event) {
+    const files = Array.from(event.target.files || [])
+    if (!files.length || !token) return
+
+    let articleId = articleDraft.id
+    if (!articleId) {
+      const savedArticle = await saveArticleWithStatus(articleDraft.status || 'draft')
+      articleId = savedArticle?.id || ''
+    }
+
+    if (!articleId) {
+      event.target.value = ''
+      return
+    }
+
+    setIsUploadingArticleAssets(true)
+    setServerMessage('Uploading note attachments...')
+
+    try {
+      let nextArticles = articles
+      let latestArticle = articleDraft
+
+      for (let index = 0; index < files.length; index += 1) {
+        const data = await apiFetch(
+          '/api/articles/upload',
+          {
+            method: 'POST',
+            body: buildUploadFormData(files[index], {
+              articleId,
+            }),
+          },
+          token,
+        )
+
+        nextArticles = Array.isArray(data.articles) ? data.articles : nextArticles
+        latestArticle = data.article || latestArticle
+      }
+
+      setArticles(nextArticles)
+      setActiveArticleId(articleId)
+      setArticleDraft(latestArticle)
+      setIsCreatingArticle(false)
+      setServerMessage('Article attachments uploaded successfully.')
+    } catch (error) {
+      setServerMessage(error instanceof Error ? error.message : 'Attachment upload failed.')
+    } finally {
+      setIsUploadingArticleAssets(false)
+      event.target.value = ''
+    }
+  }
+
+  async function handleDeleteArticleAttachment(attachment) {
+    if (!token || !articleDraft.id || !attachment?.id) return
+    const shouldDelete = window.confirm(`Delete attachment "${attachment.title || 'attachment'}"?`)
+    if (!shouldDelete) return
+
+    try {
+      const data = await apiFetch(
+        '/api/articles/attachment/remove',
+        {
+          method: 'POST',
+          body: JSON.stringify({
+            articleId: articleDraft.id,
+            attachmentId: attachment.id,
+          }),
+        },
+        token,
+      )
+
+      const nextArticles = Array.isArray(data.articles) ? data.articles : articles
+      const nextArticle = data.article || nextArticles.find((item) => item.id === articleDraft.id) || articleDraft
+      setArticles(nextArticles)
+      setArticleDraft(nextArticle)
+      setActiveNote((current) => (current?.id === attachment.id ? null : current))
+      setServerMessage('Attachment deleted.')
+    } catch (error) {
+      setServerMessage(error instanceof Error ? error.message : 'Unable to delete the attachment.')
+    }
+  }
+
+  function handleBatchDownloadArticles(collection, ids, emptyMessage) {
+    const selectedArticles = collection.filter((article) => ids.includes(article.id))
+    if (!selectedArticles.length) {
+      setServerMessage(emptyMessage)
+      return
+    }
+
+    selectedArticles.forEach((article, index) => {
+      window.setTimeout(() => downloadArticle(article), index * 150)
+    })
+    setServerMessage(`Started downloading ${selectedArticles.length} note articles.`)
   }
 
   async function uploadNotes(files, isFolderUpload = false) {
     if (!files.length || !token) return
 
     setIsUploading(true)
-    setServerMessage(isFolderUpload ? '正在读取文件夹并同步到服务器...' : '正在读取文件并同步到服务器...')
+    setServerMessage(isFolderUpload ? 'Reading folder and syncing to server...' : 'Reading files and syncing to server...')
 
     try {
-      const uploadedNotes = await Promise.all(files.map((file) => createNoteFromFile(file)))
-      const data = await apiFetch(
-        '/api/notes/import',
-        {
-          method: 'POST',
-          body: JSON.stringify({ notes: uploadedNotes }),
-        },
-        token,
-      )
+      let latestNotes = notes
 
-      setNotes(Array.isArray(data.notes) ? data.notes : [])
+      for (let index = 0; index < files.length; index += 1) {
+        if (files.length > 1) {
+          setServerMessage(`Uploading file ${index + 1}/${files.length}...`)
+        }
+
+        const data = await apiFetch(
+          '/api/notes/upload',
+          {
+            method: 'POST',
+            body: buildUploadFormData(files[index]),
+          },
+          token,
+        )
+
+        latestNotes = Array.isArray(data.notes) ? data.notes : latestNotes
+      }
+
+      setNotes(latestNotes)
       setSelectedNoteIds([])
-      setServerMessage(isFolderUpload ? '文件夹上传成功。' : '常用文件上传成功。')
+      setServerMessage(isFolderUpload ? 'Folder upload completed.' : 'Files uploaded successfully.')
     } catch (error) {
-      setServerMessage(error instanceof Error ? error.message : '上传失败，请稍后重试。')
+      setServerMessage(error instanceof Error ? error.message : 'Upload failed. Please try again later.')
     } finally {
       setIsUploading(false)
     }
@@ -1547,27 +2351,34 @@ function App() {
     if (!files.length || !token || !activeProjectId) return
 
     setIsUploadingProject(true)
-    setServerMessage(isFolderUpload ? '正在上传项目文件夹...' : '正在上传项目文件...')
+    setServerMessage(isFolderUpload ? 'Uploading project folder...' : 'Uploading project files...')
 
     try {
-      const uploadedNotes = await Promise.all(files.map((file) => createNoteFromFile(file)))
-      const data = await apiFetch(
-        '/api/projects/import',
-        {
-          method: 'POST',
-          body: JSON.stringify({
-            projectId: activeProjectId,
-            notes: uploadedNotes,
-          }),
-        },
-        token,
-      )
+      let nextProjects = projects
 
-      const nextProjects = Array.isArray(data.projects) ? data.projects : projects
+      for (let index = 0; index < files.length; index += 1) {
+        if (files.length > 1) {
+          setServerMessage(`Uploading project file ${index + 1}/${files.length}...`)
+        }
+
+        const data = await apiFetch(
+          '/api/projects/upload',
+          {
+            method: 'POST',
+            body: buildUploadFormData(files[index], {
+              projectId: activeProjectId,
+            }),
+          },
+          token,
+        )
+
+        nextProjects = Array.isArray(data.projects) ? data.projects : nextProjects
+      }
+
       setProjects(nextProjects)
-      setServerMessage(isFolderUpload ? '项目文件夹上传成功。' : '项目文件上传成功。')
+      setServerMessage(isFolderUpload ? 'Project folder upload completed.' : 'Project files uploaded successfully.')
     } catch (error) {
-      setServerMessage(error instanceof Error ? error.message : '项目文件上传失败，请稍后重试。')
+      setServerMessage(error instanceof Error ? error.message : 'Project upload failed. Please try again later.')
     } finally {
       setIsUploadingProject(false)
     }
@@ -1696,6 +2507,36 @@ function App() {
         return
       }
 
+      if (scope === 'articles') {
+        const data = await apiFetch(
+          ids.length > 1 ? '/api/articles/batch' : '/api/articles/remove',
+          {
+            method: 'POST',
+            body: JSON.stringify(
+              ids.length > 1
+                ? {
+                    action: currentAction.action,
+                    ids,
+                  }
+                : {
+                    articleId: ids[0],
+                  },
+            ),
+          },
+          token,
+        )
+
+        const nextArticles = Array.isArray(data.articles) ? data.articles : []
+        setArticles(nextArticles)
+        setSelectedArticleIds([])
+        setActiveArticleId((current) => (current && ids.includes(current) ? nextArticles[0]?.id || '' : current))
+        setArticleDraft((current) => (current?.id && ids.includes(current.id) ? nextArticles[0] || createEmptyArticle() : current))
+        setIsCreatingArticle(!nextArticles.length)
+        setConfirmConfig(null)
+        setServerMessage(ids.length > 1 ? `Deleted ${ids.length} note articles.` : 'Note article deleted.')
+        return
+      }
+
       await apiFetch(
         '/api/notes/batch',
         {
@@ -1751,6 +2592,11 @@ function App() {
       filteredNotes={filteredNotes}
       trashedNotes={trashedNotes}
       projects={projects}
+      articles={articles}
+      articleDraft={articleDraft}
+      articleQuery={articleQuery}
+      activeArticleId={activeArticleId}
+      selectedArticleIds={selectedArticleIds}
       selectedNoteIds={selectedNoteIds}
       selectedTrashIds={selectedTrashIds}
       selectedProjectNoteIds={selectedProjectNoteIds}
@@ -1760,6 +2606,8 @@ function App() {
       activeProjectId={activeProjectId}
       isUploading={isUploading}
       isUploadingProject={isUploadingProject}
+      isSavingArticle={isSavingArticle}
+      isUploadingArticleAssets={isUploadingArticleAssets}
       isDeleteWorking={isDeleteWorking}
       serverMessage={serverMessage}
       session={session}
@@ -1769,6 +2617,44 @@ function App() {
       onPageChange={setActivePage}
       onLogout={handleLogout}
       onQueryChange={setQuery}
+      onArticleQueryChange={setArticleQuery}
+      onSelectArticle={handleSelectArticle}
+      onCreateArticle={handleCreateArticle}
+      onArticleFieldChange={handleArticleFieldChange}
+      onSaveArticle={() => saveArticleWithStatus('draft')}
+      onPublishArticle={() => saveArticleWithStatus('published')}
+      onDeleteArticle={handleDeleteArticle}
+      onToggleArticleSelect={(id) => toggleSelection(setSelectedArticleIds, id)}
+      onToggleAllArticles={() => toggleAllSelection(setSelectedArticleIds, articles.filter((article) => {
+        const keyword = articleQuery.trim().toLowerCase()
+        if (!keyword) return true
+        return [article.title, article.summary, article.content, (article.tags || []).join(' ')].join(' ').toLowerCase().includes(keyword)
+      }), selectedArticleIds)}
+      onClearArticleSelection={() => setSelectedArticleIds([])}
+      onBatchDownloadArticles={() =>
+        handleBatchDownloadArticles(
+          articles.filter((article) => {
+            const keyword = articleQuery.trim().toLowerCase()
+            if (!keyword) return true
+            return [article.title, article.summary, article.content, (article.tags || []).join(' ')].join(' ').toLowerCase().includes(keyword)
+          }),
+          selectedArticleIds,
+          'Please select note articles to download first.',
+        )
+      }
+      onBatchDeleteArticles={() =>
+        openScopedBatchConfirm(
+          'articles',
+          'remove',
+          selectedArticleIds,
+          '批量删除笔记',
+          '确认批量删除',
+          `确认删除 ${selectedArticleIds.length} 篇已选择的笔记吗？删除后无法恢复，附件也会一起删除。`,
+        )
+      }
+      onUploadCover={handleUploadArticleCover}
+      onUploadAttachments={handleUploadArticleAttachments}
+      onDeleteArticleAttachment={handleDeleteArticleAttachment}
       onProjectQueryChange={setProjectQuery}
       onProjectNameChange={setProjectName}
       onCreateProject={handleCreateProject}
