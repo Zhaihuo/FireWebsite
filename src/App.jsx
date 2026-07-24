@@ -708,7 +708,7 @@ function UploadFileInput({ disabled, onChange, copy, small }) {
 
 function FrontendView() {
   return (
-    <section className="blog-section card">
+    <section className="blog-section card section-frontend">
       <div className="section-head">
         <div>
           <p className="eyebrow">Frontend</p>
@@ -728,7 +728,7 @@ function FrontendView() {
 
 function BackendView() {
   return (
-    <section className="blog-section card">
+    <section className="blog-section card section-backend">
       <div className="section-head">
         <div>
           <p className="eyebrow">Backend</p>
@@ -767,7 +767,7 @@ function NotesView({
   const allSelected = filteredNotes.length > 0 && filteredNotes.every((note) => selectedIds.includes(note.id))
 
   return (
-    <section className="blog-section card">
+    <section className="blog-section card section-notes">
       <div className="section-head">
         <div>
           <p className="eyebrow">Common Files</p>
@@ -869,7 +869,7 @@ function ProjectsView({
   const allSelected = activeProjectNotes.length > 0 && activeProjectNotes.every((note) => selectedIds.includes(note.id))
 
   return (
-    <section className="blog-section card">
+    <section className="blog-section card section-projects">
       <div className="section-head">
         <div>
           <p className="eyebrow">Projects</p>
@@ -993,7 +993,7 @@ function TrashView({
   const allSelected = trashedNotes.length > 0 && trashedNotes.every((note) => selectedIds.includes(note.id))
 
   return (
-    <section className="blog-section card">
+    <section className="blog-section card section-trash">
       <div className="section-head">
         <div>
           <p className="eyebrow">Trash</p>
@@ -1242,7 +1242,7 @@ function WebsiteShell(props) {
 
   return (
     <>
-      <main className="blog-shell">
+      <main className={`blog-shell page-${activePage}`}>
         <header className="blog-topbar card">
           <div className="topbar-brand">
             <p className="eyebrow">Fire Coder Blog</p>
