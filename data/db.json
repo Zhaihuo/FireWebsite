@@ -1,11 +1,6 @@
 {
   "sessions": [
     {
-      "token": "0510b2ac51e9278cb31f897b2312033e1257bae9409173f6",
-      "userId": "edb1357b68b7452fc60bf155",
-      "createdAt": "2026-07-24T02:42:14.246Z"
-    },
-    {
       "token": "1bb41592c01ead9a37933c5cb786329a9ad4b77ef7c656d1",
       "userId": "7114147b5892311902279dab",
       "createdAt": "2026-07-24T03:29:55.938Z"
@@ -14,6 +9,11 @@
       "token": "115fbeeb5065490440143924dcb6d80863d0666de84ec994",
       "userId": "b9158d0bbd5959a34088e910",
       "createdAt": "2026-07-24T03:30:19.677Z"
+    },
+    {
+      "token": "2a4c4aaeaae8cd5c9bf1d88bfa69edad6e392e19ef983570",
+      "userId": "edb1357b68b7452fc60bf155",
+      "createdAt": "2026-07-24T07:12:40.313Z"
     }
   ],
   "users": [

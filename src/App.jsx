@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import './App.css'
 
 const TOKEN_KEY = 'firewebsite-auth-token'
@@ -24,12 +24,14 @@ const SUPPORTED_ACCEPT = [
   '.xlsx',
 ].join(',')
 
+const ARTICLE_AUTO_SAVE_DELAY_MS = 1200
+
 const profile = {
-  name: 'firefire',
-  role: '产品 / 前端 / 后端 / 视觉设计',
+  name: '翎羽晨风',
+  role: '产品策划 / 交互体验 / 数据管理 / 视觉设计',
   intro: '把常用文件、项目文件和服务端存储整理成一个更接近博客后台的知识工作台。',
-  location: 'Remote · China',
-  status: '当前站点支持登录、常用文件、项目管理、垃圾管理、文件夹上传和服务端永久保存。',
+  location: '中国 · 远程',
+  status: '当前站点支持登录、常用文件、项目管理、回收站管理、文件夹上传和服务端永久保存。',
 }
 
 const APP_VERSION = typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : 'dev'
@@ -37,12 +39,12 @@ const APP_BUILD_TIME = typeof __APP_BUILD_TIME__ !== 'undefined' ? __APP_BUILD_T
 
 const frontendPosts = [
   {
-    title: '前端展示页：多页面工作台',
-    summary: '登录后进入前端、后端、常用文件、项目、垃圾管理等独立页面，不再是一个长页面堆叠。',
+    title: '站点结构：多模块工作台',
+    summary: '登录后进入站点体验、数据中心、常用文件、项目空间、笔记管理与回收站等独立页面，不再是单一长页堆叠。',
     tags: ['React', 'UI', 'Workspace'],
   },
   {
-    title: '上传层：文件和文件夹并存',
+    title: '资料入口：文件与文件夹并行',
     summary: '常用文件页和项目页都支持上传单个文件，也支持上传整个文件夹，并保留原始文件夹层级。',
     tags: ['Upload', 'Folder', 'Files'],
   },
@@ -50,19 +52,55 @@ const frontendPosts = [
 
 const backendPosts = [
   {
-    title: '后端服务层：账号与永久保存',
+    title: '数据中心：账号与长期保存',
     summary: '所有账号、常用文件、项目和项目内文件统一保存在服务器，重新登录或更换电脑都能恢复。',
     tags: ['Auth', 'API', 'Storage'],
   },
   {
     title: '批量操作：一次确认，一次执行',
-    summary: '批量删除、批量恢复和批量彻底删除都只弹出一次确认窗口，然后统一走后端批量接口。',
+    summary: '批量删除、批量恢复和批量彻底删除都只弹出一次确认窗口，然后统一走服务端批量处理流程。',
     tags: ['Batch', 'Confirm', 'Server'],
   },
 ]
 
+const frontendHighlights = [
+  {
+    label: '页面结构',
+    value: '6 大模块',
+    detail: '站点体验、数据中心、常用文件、笔记、项目与回收站清晰分区。',
+  },
+  {
+    label: '上传体验',
+    value: '双入口',
+    detail: '同时支持单文件上传与文件夹上传，保留层级结构。',
+  },
+  {
+    label: '交互方式',
+    value: '批量操作',
+    detail: '选择、下载、删除、恢复等动作都采用统一工具条与确认流程。',
+  },
+]
+
+const backendHighlights = [
+  {
+    label: '数据存储',
+    value: '服务端持久化',
+    detail: '账号、文件、项目、笔记和附件统一写入服务端数据文件。',
+  },
+  {
+    label: '权限状态',
+    value: '登录隔离',
+    detail: '每个账号都有独立的工作区数据，重新登录后可以继续使用。',
+  },
+  {
+    label: '删除机制',
+    value: '两段式',
+    detail: '先进入回收站，再由用户确认后执行彻底删除。',
+  },
+]
+
 const links = [
-  { label: 'GitHub', href: 'https://github.com/' },
+  { label: '代码仓库', href: 'https://github.com/' },
   { label: '邮箱', href: 'mailto:2948756447@qq.com' },
   { label: '项目管理', href: '#' },
 ]
@@ -105,33 +143,33 @@ function formatBeijingTime(value) {
 
 const pageMeta = {
   frontend: {
-    eyebrow: 'Frontend',
-    title: '前端展示区',
-    description: '查看当前网站的页面组织、上传体验和界面说明。',
+    eyebrow: '站点体验',
+    title: '站点体验区',
+    description: '查看当前网站的页面组织、上传流程与整体使用体验。',
   },
   backend: {
-    eyebrow: 'Backend',
-    title: '后端服务区',
-    description: '查看账号、项目、常用文件和服务端永久保存结构。',
+    eyebrow: '数据中心',
+    title: '数据中心',
+    description: '查看账号、项目、常用文件与长期保存结构。',
   },
   notes: {
-    eyebrow: 'Common Files',
+    eyebrow: '常用文件',
     title: '常用文件区',
     description: '上传文件、上传文件夹、搜索内容并进行批量管理。',
   },
   writing: {
-    eyebrow: 'Note Studio',
+    eyebrow: '笔记工作台',
     title: '笔记管理',
     description: '像博客后台一样管理笔记，支持标题、摘要、正文、封面、标签与附件。',
   },
   projects: {
-    eyebrow: 'Projects',
+    eyebrow: '项目',
     title: '项目管理区',
     description: '创建项目、搜索项目名称，并在每个项目里单独上传文件或文件夹。',
   },
   trash: {
-    eyebrow: 'Trash',
-    title: '垃圾管理区',
+    eyebrow: '回收站',
+    title: '回收站管理区',
     description: '恢复已删除常用文件，或进行最终彻底删除。',
   },
 }
@@ -304,17 +342,39 @@ function downloadNote(note) {
 }
 
 function buildArticleDownloadContent(article) {
-  const tagsLine = Array.isArray(article.tags) && article.tags.length ? `Tags: ${article.tags.join(', ')}` : 'Tags:'
-  const summaryLine = article.summary ? `Summary:\n${article.summary}` : 'Summary:'
-  const contentLine = article.content ? `Content:\n${article.content}` : 'Content:'
+  const tagsLine = Array.isArray(article.tags) && article.tags.length ? `标签：${article.tags.join(', ')}` : '标签：'
+  const summaryLine = article.summary ? `摘要：\n${article.summary}` : '摘要：'
+  const contentLine = article.content ? `正文：\n${article.content}` : '正文：'
 
-  return [`# ${article.title || 'Untitled Note'}`, tagsLine, '', summaryLine, '', contentLine].join('\n')
+  return [`# ${article.title || '未命名笔记'}`, tagsLine, '', summaryLine, '', contentLine].join('\n')
+}
+
+function buildArticleDraftFingerprint(article) {
+  return JSON.stringify({
+    id: article?.id || '',
+    title: article?.title || '',
+    summary: article?.summary || '',
+    content: article?.content || '',
+    coverImage: article?.coverImage || '',
+    tags: Array.isArray(article?.tags) ? article.tags : [],
+    status: article?.status || 'draft',
+  })
+}
+
+function hasMeaningfulArticleContent(article) {
+  return Boolean(
+    String(article?.title || '').trim() ||
+      String(article?.summary || '').trim() ||
+      String(article?.content || '').trim() ||
+      String(article?.coverImage || '').trim() ||
+      (Array.isArray(article?.tags) && article.tags.length),
+  )
 }
 
 function downloadArticle(article) {
   const blob = new Blob([buildArticleDownloadContent(article)], { type: 'text/markdown;charset=utf-8' })
   const url = URL.createObjectURL(blob)
-  const fileName = `${(article.title || 'untitled-note').replace(/[\\/:*?"<>|]+/g, '-').slice(0, 80) || 'untitled-note'}.md`
+  const fileName = `${(article.title || '未命名笔记').replace(/[\\/:*?"<>|]+/g, '-').slice(0, 80) || '未命名笔记'}.md`
   triggerFileDownload(fileName, url)
   window.setTimeout(() => URL.revokeObjectURL(url), 800)
 }
@@ -335,7 +395,7 @@ async function apiFetch(path, options = {}, token = null) {
   const data = text ? JSON.parse(text) : {}
 
   if (!response.ok) {
-    throw new Error(data.message || '???????????')
+    throw new Error(data.message || '请求失败，请稍后重试。')
   }
 
   return data
@@ -364,7 +424,7 @@ function createFolderNode(name, fullPath = '') {
 }
 
 function buildFolderTree(notes) {
-  const root = createFolderNode('Root Files')
+  const root = createFolderNode('根目录文件')
 
   for (const note of notes) {
     const relativePath = String(note.relativePath || '').replace(/\\/g, '/')
@@ -419,7 +479,7 @@ function LoginScreen({
     <main className="login-shell">
       <section className="login-panel card">
         <div className="login-copy">
-          <p className="eyebrow">Fire Notes</p>
+          <p className="eyebrow">火焰笔记</p>
           <h1>先登录，再进入你的项目与常用文件空间</h1>
           <p className="intro">登录后可管理常用文件、项目内文件和文件夹结构，数据会跟随账号永久保存到服务器。</p>
           <div className="status-strip">
@@ -489,6 +549,26 @@ function PostCard({ title, summary, tags, category }) {
         ))}
       </div>
     </article>
+  )
+}
+
+function InsightCard({ label, value, detail }) {
+  return (
+    <article className="insight-card">
+      <p className="insight-label">{label}</p>
+      <h3>{value}</h3>
+      <p>{detail}</p>
+    </article>
+  )
+}
+
+function OverviewStrip({ items }) {
+  return (
+    <div className="overview-strip">
+      {items.map((item) => (
+        <InsightCard key={`${item.label}-${item.value}`} {...item} />
+      ))}
+    </div>
   )
 }
 
@@ -816,10 +896,10 @@ function FolderTreeNode({ node, depth = 0, selectedIds, onToggleSelect, onOpenNo
           <section className="folder-section">
             <div className="folder-section-head">
               <div>
-                <p className="folder-section-kicker">Direct Upload</p>
-                <h3>Root Files</h3>
+                <p className="folder-section-kicker">直接上传</p>
+                <h3>根目录文件</h3>
               </div>
-              <span>{node.files.length} files</span>
+              <span>{node.files.length} 个文件</span>
             </div>
 
             <div className="notes-feed">
@@ -859,10 +939,10 @@ function FolderTreeNode({ node, depth = 0, selectedIds, onToggleSelect, onOpenNo
     <section className="folder-section folder-tree-branch" style={{ '--folder-depth': depth }}>
       <button className="folder-section-head folder-toggle" type="button" onClick={() => setIsOpen((current) => !current)}>
         <div>
-          <p className="folder-section-kicker">{depth === 0 ? 'Folder Upload' : 'Subfolder'}</p>
+          <p className="folder-section-kicker">{depth === 0 ? '文件夹上传' : '子文件夹'}</p>
           <h3>{node.name}</h3>
         </div>
-        <span>{isOpen ? 'Hide' : 'Show'} · {node.files.length + node.folders.length} items</span>
+        <span>{isOpen ? '收起' : '展开'} · {node.files.length + node.folders.length} 项</span>
       </button>
 
       {isOpen ? (
@@ -939,40 +1019,68 @@ function UploadFileInput({ disabled, onChange, copy, small }) {
   )
 }
 
-function FrontendView() {
+function FrontendView({ notesCount, projectsCount, articlesCount }) {
+  const overviewItems = [
+    { label: '当前文件', value: `${notesCount} 份`, detail: '常用文件区可直接查看、批量选择、下载或删除。' },
+    { label: '当前项目', value: `${projectsCount} 个`, detail: '项目页按空间管理资料，适合长期分类沉淀。' },
+    { label: '当前笔记', value: `${articlesCount} 篇`, detail: '笔记管理页支持长文编辑、附件、预览与自动保存。' },
+  ]
+
   return (
     <section className="blog-section card section-frontend">
       <div className="section-head">
         <div>
-          <p className="eyebrow">Frontend</p>
-          <h2>前端展示区</h2>
+          <p className="eyebrow">站点体验</p>
+          <h2>站点体验区</h2>
         </div>
-        <span>负责页面、导航和上传体验</span>
+        <span>聚焦页面组织、导航逻辑与资料上传体验</span>
+      </div>
+
+      <OverviewStrip items={overviewItems} />
+
+      <div className="insight-grid">
+        {frontendHighlights.map((item) => (
+          <InsightCard key={item.label} {...item} />
+        ))}
       </div>
 
       <div className="blog-post-list">
         {frontendPosts.map((post) => (
-          <PostCard key={post.title} {...post} category="前端文章" />
+          <PostCard key={post.title} {...post} category="体验专题" />
         ))}
       </div>
     </section>
   )
 }
 
-function BackendView() {
+function BackendView({ notesCount, projectsCount, articlesCount }) {
+  const overviewItems = [
+    { label: '数据文件', value: '1 份核心库', detail: '当前所有账号与内容都沉淀在 data/db.json 中。' },
+    { label: '内容规模', value: `${notesCount + projectsCount + articlesCount}`, detail: '文件、项目和笔记共同组成你的个人资料库。' },
+    { label: '回收机制', value: '先回收后删除', detail: '危险操作统一通过确认弹窗和回收站中转。' },
+  ]
+
   return (
     <section className="blog-section card section-backend">
       <div className="section-head">
         <div>
-          <p className="eyebrow">Backend</p>
-          <h2>后端服务区</h2>
+          <p className="eyebrow">数据中心</p>
+          <h2>数据中心</h2>
         </div>
-        <span>负责登录、项目、文件和永久存储</span>
+        <span>聚焦登录状态、内容存储、项目资料与长期保存</span>
+      </div>
+
+      <OverviewStrip items={overviewItems} />
+
+      <div className="insight-grid">
+        {backendHighlights.map((item) => (
+          <InsightCard key={item.label} {...item} />
+        ))}
       </div>
 
       <div className="blog-post-list">
         {backendPosts.map((post) => (
-          <PostCard key={post.title} {...post} category="后端文章" />
+          <PostCard key={post.title} {...post} category="系统专题" />
         ))}
       </div>
     </section>
@@ -984,6 +1092,7 @@ function WritingView({
   activeArticleId,
   articleDraft,
   articleQuery,
+  articleAutoSaveLabel,
   selectedArticleIds,
   isSavingArticle,
   isUploadingArticleAssets,
@@ -1017,7 +1126,7 @@ function WritingView({
     )
   }, [articles, articleQuery])
 
-  const articleCountLabel = `${articles.length} notes`
+  const articleCountLabel = `${articles.length} 篇笔记`
   const attachmentCount = Array.isArray(articleDraft.attachments) ? articleDraft.attachments.length : 0
   const allSelected = filteredArticles.length > 0 && filteredArticles.every((article) => selectedArticleIds.includes(article.id))
 
@@ -1025,10 +1134,10 @@ function WritingView({
     <section className="blog-section card section-writing">
       <div className="section-head">
         <div>
-          <p className="eyebrow">Note Studio</p>
+          <p className="eyebrow">笔记工作台</p>
           <h2>笔记管理页</h2>
         </div>
-        <span>Write long-form notes with a CSDN-style publishing desk.</span>
+        <span>像 CSDN 后台一样编写、管理和发布长文笔记。</span>
       </div>
 
       <div className="writing-layout">
@@ -1068,17 +1177,17 @@ function WritingView({
                   <SelectionCheckbox
                     checked={selectedArticleIds.includes(article.id)}
                     onChange={() => onToggleArticleSelect(article.id)}
-                    label={`选择 ${article.title || 'Untitled Note'}`}
+                    label={`选择 ${article.title || '未命名笔记'}`}
                   />
                 </div>
 
                 <button className="writing-card-main" type="button" onClick={() => onSelectArticle(article.id)}>
                   <div className="writing-card-meta">
-                    <span className={`status-dot status-${article.status}`}>{article.status}</span>
+                    <span className={`status-dot status-${article.status}`}>{article.status === 'published' ? '已发布' : '草稿'}</span>
                     <span>{formatBeijingTime(article.updatedAt || article.createdAt)}</span>
                   </div>
-                  <h3>{article.title || 'Untitled Note'}</h3>
-                  <p>{article.summary || 'No summary yet. Start writing to build your article card.'}</p>
+                  <h3>{article.title || '未命名笔记'}</h3>
+                  <p>{article.summary || '暂无摘要，开始编辑后这里会显示这篇笔记的简介。'}</p>
                 </button>
               </article>
             ))}
@@ -1090,8 +1199,8 @@ function WritingView({
         <div className="writing-editor">
           <div className="writing-editor-top">
             <div>
-              <p className="eyebrow">Editor</p>
-              <h3>{articleDraft.id ? '文章编辑中' : '新建文章'}</h3>
+              <p className="eyebrow">编辑区</p>
+              <h3>{articleDraft.id ? '正在编辑笔记' : '新建笔记'}</h3>
             </div>
 
             <div className="writing-actions">
@@ -1109,7 +1218,7 @@ function WritingView({
 
           <div className="writing-cover card-lite">
             <div className="writing-cover-preview">
-              {articleDraft.coverImage ? <img src={articleDraft.coverImage} alt={articleDraft.title || 'cover'} /> : <div className="cover-placeholder">Cover Preview</div>}
+              {articleDraft.coverImage ? <img src={articleDraft.coverImage} alt={articleDraft.title || '笔记封面'} /> : <div className="cover-placeholder">封面预览</div>}
             </div>
             <div className="writing-cover-fields">
               <label>
@@ -1156,7 +1265,7 @@ function WritingView({
               <span>标签</span>
               <input
                 value={(articleDraft.tags || []).join(', ')}
-                placeholder="前端, React, 项目总结"
+                placeholder="随笔, 方案整理, 项目总结"
                 onChange={(event) => onArticleFieldChange('tags', parseTagInput(event.target.value))}
               />
             </label>
@@ -1184,11 +1293,11 @@ function WritingView({
 
             <section className="writing-preview card-lite">
               <div className="writing-preview-head">
-                <p className="eyebrow">Live Preview</p>
-                <span>{articleDraft.status}</span>
+                <p className="eyebrow">实时预览</p>
+                <span>{articleDraft.status === 'published' ? '发布视图' : '草稿视图'}</span>
               </div>
               <h2>{articleDraft.title || '未命名笔记'}</h2>
-              <p className="writing-preview-summary">{articleDraft.summary || '这里会显示文章摘要。'}</p>
+              <p className="writing-preview-summary">{articleDraft.summary || '这里会显示笔记摘要。'}</p>
               <pre className="writing-preview-body">{articleDraft.content || '这里会实时预览正文内容。'}</pre>
             </section>
           </div>
@@ -1196,10 +1305,10 @@ function WritingView({
           <section className="writing-assets card-lite">
             <div className="writing-assets-head">
               <div>
-                <p className="eyebrow">Attachments</p>
-                <h3>附件素材</h3>
+                <p className="eyebrow">附件</p>
+                <h3>附件资源</h3>
               </div>
-              <span>{attachmentCount} files</span>
+              <span>{attachmentCount} 个附件</span>
             </div>
 
             <label className="upload-zone">
@@ -1229,13 +1338,14 @@ function WritingView({
                 </div>
               ))}
 
-              {!attachmentCount ? <div className="empty-state">保存文章后即可上传附件，适合挂设计稿、PDF、表格和截图。</div> : null}
+              {!attachmentCount ? <div className="empty-state">保存笔记后即可上传附件，适合挂设计稿、PDF、表格和截图。</div> : null}
             </div>
           </section>
 
           <div className="note-stats">
             <span>{serverMessage}</span>
-            <span>状态：{articleDraft.status}</span>
+            <span>{articleAutoSaveLabel || '自动保存未开始。'}</span>
+            <span>状态：{articleDraft.status === 'published' ? '已发布' : '草稿'}</span>
             <span>更新时间：{formatBeijingTime(articleDraft.updatedAt || articleDraft.createdAt)}</span>
           </div>
         </div>
@@ -1269,7 +1379,7 @@ function NotesView({
     <section className="blog-section card section-notes">
       <div className="section-head">
         <div>
-          <p className="eyebrow">Common Files</p>
+          <p className="eyebrow">常用文件</p>
           <h2>常用文件区</h2>
         </div>
         <span>上传文件、上传文件夹、搜索和批量管理</span>
@@ -1366,10 +1476,10 @@ function ProjectsView({
     <section className="blog-section card section-projects">
       <div className="section-head">
         <div>
-          <p className="eyebrow">Projects</p>
+          <p className="eyebrow">项目</p>
           <h2>项目管理区</h2>
         </div>
-        <span>创建项目、搜索项目名、上传文件和文件夹</span>
+        <span>创建项目、搜索项目名、上传文件并保留文件夹结构</span>
       </div>
 
       <div className="project-topbar">
@@ -1409,7 +1519,7 @@ function ProjectsView({
             <>
               <div className="project-detail-head">
                 <div>
-                  <p className="eyebrow">Active Project</p>
+                  <p className="eyebrow">当前项目</p>
                   <h3>{activeProject.name}</h3>
                   <p className="sidebar-text">{activeProject.notes.length} 个已上传文件</p>
                   <div className="note-card-footer">
@@ -1424,13 +1534,13 @@ function ProjectsView({
                     disabled={isUploadingProject}
                     onChange={onUploadToProject}
                     copy={isUploadingProject ? '上传中...' : '上传到当前项目'}
-                    small="支持 txt、excel、word、pdf、图片等格式"
+                    small="支持 TXT、Excel、Word、PDF、图片等格式"
                   />
                   <UploadFolderInput
                     disabled={isUploadingProject}
                     onChange={onUploadFolderToProject}
                     copy={isUploadingProject ? '上传中...' : '上传项目文件夹'}
-                    small="会保留项目内的原始文件夹层级"
+                    small="会保留项目内原始文件夹层级"
                   />
                 </div>
               </div>
@@ -1484,8 +1594,8 @@ function TrashView({
     <section className="blog-section card section-trash">
       <div className="section-head">
         <div>
-          <p className="eyebrow">Trash</p>
-          <h2>垃圾管理区</h2>
+          <p className="eyebrow">回收站</p>
+          <h2>回收站管理区</h2>
         </div>
         <span>恢复内容、批量下载、彻底删除</span>
       </div>
@@ -1531,14 +1641,14 @@ function SidebarPanel({ activePage, session, activeNotes, trashedNotes, projects
     return (
       <>
         <section className="sidebar-card card">
-          <p className="eyebrow">Studio</p>
+          <p className="eyebrow">写作台</p>
           <h3>博客写作台</h3>
           <p className="sidebar-text">像 CSDN 后台一样写标题、摘要、正文、封面和附件。</p>
           <p className="sidebar-text">当前账号：{session.username}</p>
         </section>
 
         <section className="sidebar-card card">
-          <p className="eyebrow">Tips</p>
+          <p className="eyebrow">提示</p>
           <h3>推荐写法</h3>
           <ul className="sidebar-list">
             <li>标题突出主题和结果</li>
@@ -1555,7 +1665,7 @@ function SidebarPanel({ activePage, session, activeNotes, trashedNotes, projects
     return (
       <>
         <section className="sidebar-card card">
-          <p className="eyebrow">Projects</p>
+          <p className="eyebrow">项目</p>
           <h3>项目概览</h3>
           <p className="sidebar-text">项目数量：{projects.length}</p>
           <p className="sidebar-text">当前账号：{session.username}</p>
@@ -1583,7 +1693,7 @@ function SidebarPanel({ activePage, session, activeNotes, trashedNotes, projects
           <p className="eyebrow">删除规则</p>
           <h3>两段式删除</h3>
           <ul className="sidebar-list">
-            <li>第一次删除：进入垃圾管理。</li>
+            <li>第一次删除：进入回收站管理。</li>
             <li>第二次删除：从服务器彻底清除。</li>
             <li>批量操作只会弹出一个确认窗口。</li>
           </ul>
@@ -1592,7 +1702,7 @@ function SidebarPanel({ activePage, session, activeNotes, trashedNotes, projects
         <section className="sidebar-card card">
           <p className="eyebrow">统计</p>
           <h3>回收情况</h3>
-          <p className="sidebar-text">垃圾管理文件数：{trashedNotes.length}</p>
+          <p className="sidebar-text">回收站文件数：{trashedNotes.length}</p>
           <p className="sidebar-text">常用文件数：{activeNotes.length}</p>
         </section>
       </>
@@ -1605,7 +1715,7 @@ function SidebarPanel({ activePage, session, activeNotes, trashedNotes, projects
         <p className="eyebrow">当前账号</p>
         <h3>{session.username}</h3>
         <p className="sidebar-text">常用文件：{activeNotes.length}</p>
-        <p className="sidebar-text">垃圾管理：{trashedNotes.length}</p>
+        <p className="sidebar-text">回收站：{trashedNotes.length}</p>
         <p className="sidebar-text">项目数量：{projects.length}</p>
       </section>
 
@@ -1635,6 +1745,7 @@ function WebsiteShell(props) {
     articleDraft,
     articleQuery,
     activeArticleId,
+    articleAutoSaveLabel,
     selectedArticleIds,
     selectedNoteIds,
     selectedTrashIds,
@@ -1705,6 +1816,12 @@ function WebsiteShell(props) {
     onConfirmAction,
   } = props
 
+  const heroStats = [
+    { label: '常用文件', value: `${activeNotes.length} 份` },
+    { label: '项目空间', value: `${projects.length} 个` },
+    { label: '笔记内容', value: `${articles.length} 篇` },
+  ]
+
   let mainView = (
     <NotesView
       activeNotes={activeNotes}
@@ -1726,8 +1843,12 @@ function WebsiteShell(props) {
     />
   )
 
-  if (activePage === 'frontend') mainView = <FrontendView />
-  if (activePage === 'backend') mainView = <BackendView />
+  if (activePage === 'frontend') {
+    mainView = <FrontendView notesCount={activeNotes.length} projectsCount={projects.length} articlesCount={articles.length} />
+  }
+  if (activePage === 'backend') {
+    mainView = <BackendView notesCount={activeNotes.length} projectsCount={projects.length} articlesCount={articles.length} />
+  }
   if (activePage === 'writing') {
     mainView = (
       <WritingView
@@ -1735,6 +1856,7 @@ function WebsiteShell(props) {
         activeArticleId={activeArticleId}
         articleDraft={articleDraft}
         articleQuery={articleQuery}
+        articleAutoSaveLabel={articleAutoSaveLabel}
         selectedArticleIds={selectedArticleIds}
         isSavingArticle={isSavingArticle}
         isUploadingArticleAssets={isUploadingArticleAssets}
@@ -1809,9 +1931,9 @@ function WebsiteShell(props) {
       <main className={`blog-shell page-${activePage}`}>
         <header className="blog-topbar card">
           <div className="topbar-brand">
-            <p className="eyebrow">Fire Coder Blog</p>
+            <p className="eyebrow">翎羽晨风</p>
             <h2>{profile.name}</h2>
-            <p className="build-stamp">v{APP_VERSION} ? built {formatBeijingTime(APP_BUILD_TIME)}</p>
+            <p className="build-stamp">版本 {APP_VERSION} · 构建时间 {formatBeijingTime(APP_BUILD_TIME)}</p>
           </div>
 
           <nav className="topbar-nav" aria-label="主导航">
@@ -1831,16 +1953,28 @@ function WebsiteShell(props) {
         </header>
 
         <section className="blog-hero card">
-          <div>
+          <div className="hero-copy">
             <p className="eyebrow">{currentMeta.eyebrow}</p>
             <h1>{currentMeta.title}</h1>
             <p className="intro">{currentMeta.description}</p>
+            <p className="hero-support">
+              {profile.intro}
+            </p>
           </div>
 
           <div className="hero-summary">
             <span className="status-pill status-pill-strong">当前账号：{session.username}</span>
-            <span className="status-pill">服务端文件：`data/db.json`</span>
+            <span className="status-pill">数据文件：data/db.json</span>
             <span className="status-pill">当前模块：{currentMeta.title}</span>
+          </div>
+
+          <div className="hero-metrics">
+            {heroStats.map((item) => (
+              <article key={item.label} className="hero-metric-card">
+                <p>{item.label}</p>
+                <strong>{item.value}</strong>
+              </article>
+            ))}
           </div>
         </section>
 
@@ -1870,6 +2004,7 @@ function App() {
   const [activeArticleId, setActiveArticleId] = useState('')
   const [articleDraft, setArticleDraft] = useState(createEmptyArticle())
   const [isCreatingArticle, setIsCreatingArticle] = useState(false)
+  const [articleAutoSaveLabel, setArticleAutoSaveLabel] = useState('未检测到新的编辑内容。')
   const [query, setQuery] = useState('')
   const [projectQuery, setProjectQuery] = useState('')
   const [projectName, setProjectName] = useState('')
@@ -1890,6 +2025,10 @@ function App() {
   const [isDeleteWorking, setIsDeleteWorking] = useState(false)
   const [authMessage, setAuthMessage] = useState('注册后即可把内容永久保存到服务器。')
   const [serverMessage, setServerMessage] = useState('服务端存储已启用。')
+  const articleDraftRef = useRef(articleDraft)
+  const articleAutoSaveTimerRef = useRef(null)
+  const articleAutoSaveReadyRef = useRef(false)
+  const lastSavedArticleFingerprintRef = useRef(buildArticleDraftFingerprint(createEmptyArticle()))
 
   async function restoreSession(storedToken) {
     const data = await apiFetch('/api/auth/me', {}, storedToken)
@@ -1991,6 +2130,72 @@ function App() {
       setIsCreatingArticle(false)
     }
   }, [activeArticle, activeArticleId])
+
+  useEffect(() => {
+    articleDraftRef.current = articleDraft
+  }, [articleDraft])
+
+  useEffect(() => {
+    const sourceArticle = activeArticleId && activeArticle ? activeArticle : createEmptyArticle()
+    lastSavedArticleFingerprintRef.current = buildArticleDraftFingerprint(sourceArticle)
+    articleAutoSaveReadyRef.current = false
+    setArticleAutoSaveLabel(
+      sourceArticle.id
+        ? `最近保存时间：${formatBeijingTime(sourceArticle.updatedAt || sourceArticle.createdAt)}`
+        : '新草稿尚未保存。',
+    )
+  }, [activeArticleId, activeArticle])
+
+  useEffect(() => {
+    return () => {
+      if (articleAutoSaveTimerRef.current) {
+        window.clearTimeout(articleAutoSaveTimerRef.current)
+      }
+    }
+  }, [])
+
+  useEffect(() => {
+    if (!token || activePage !== 'writing' || isUploadingArticleAssets || isDeleteWorking) return
+
+    const fingerprint = buildArticleDraftFingerprint(articleDraft)
+
+    if (!articleAutoSaveReadyRef.current) {
+      articleAutoSaveReadyRef.current = true
+      return
+    }
+
+    if (fingerprint === lastSavedArticleFingerprintRef.current) return
+
+    if (!hasMeaningfulArticleContent(articleDraft)) {
+      setArticleAutoSaveLabel('新草稿尚未填写内容。')
+      return
+    }
+
+    setArticleAutoSaveLabel('检测到未保存修改，等待自动保存...')
+
+    if (articleAutoSaveTimerRef.current) {
+      window.clearTimeout(articleAutoSaveTimerRef.current)
+    }
+
+    articleAutoSaveTimerRef.current = window.setTimeout(() => {
+      const latestDraft = articleDraftRef.current
+      const latestFingerprint = buildArticleDraftFingerprint(latestDraft)
+
+      if (latestFingerprint === lastSavedArticleFingerprintRef.current) return
+      if (!hasMeaningfulArticleContent(latestDraft)) return
+
+      saveArticleWithStatus(latestDraft.status || 'draft', {
+        article: latestDraft,
+        silent: true,
+      })
+    }, ARTICLE_AUTO_SAVE_DELAY_MS)
+
+    return () => {
+      if (articleAutoSaveTimerRef.current) {
+        window.clearTimeout(articleAutoSaveTimerRef.current)
+      }
+    }
+  }, [activePage, articleDraft, isDeleteWorking, isUploadingArticleAssets, token])
 
   function updateCredential(key, value) {
     setCredentials((current) => ({ ...current, [key]: value }))
@@ -2101,7 +2306,7 @@ function App() {
     setArticleDraft(createEmptyArticle())
     setIsCreatingArticle(true)
     setActivePage('writing')
-    setServerMessage('A fresh note draft is ready.')
+    setServerMessage('新的笔记草稿已创建，可以开始编辑。')
   }
 
   function handleSelectArticle(articleId) {
@@ -2117,10 +2322,19 @@ function App() {
     setArticleDraft((current) => ({ ...current, [field]: value }))
   }
 
-  async function saveArticleWithStatus(status = 'draft') {
+  async function saveArticleWithStatus(status = 'draft', options = {}) {
     if (!token) return null
+    const { article = articleDraftRef.current, silent = false } = options
+
+    if (articleAutoSaveTimerRef.current) {
+      window.clearTimeout(articleAutoSaveTimerRef.current)
+      articleAutoSaveTimerRef.current = null
+    }
 
     setIsSavingArticle(true)
+    if (silent) {
+      setArticleAutoSaveLabel('自动保存中...')
+    }
 
     try {
       const data = await apiFetch(
@@ -2129,7 +2343,7 @@ function App() {
           method: 'POST',
           body: JSON.stringify({
             article: {
-              ...articleDraft,
+              ...article,
               status,
             },
           }),
@@ -2138,16 +2352,23 @@ function App() {
       )
 
       const nextArticles = Array.isArray(data.articles) ? data.articles : articles
-      const savedArticle = data.article || nextArticles.find((article) => article.id === articleDraft.id) || articleDraft
+      const savedArticle = data.article || nextArticles.find((item) => item.id === article.id) || article
+      lastSavedArticleFingerprintRef.current = buildArticleDraftFingerprint(savedArticle)
       setArticles(nextArticles)
       setActiveArticleId(savedArticle.id || '')
       setArticleDraft(savedArticle)
       setIsCreatingArticle(false)
       setActivePage('writing')
-      setServerMessage(status === 'published' ? 'Article published successfully.' : 'Draft saved successfully.')
+      setArticleAutoSaveLabel(
+        silent ? `已自动保存：${formatBeijingTime(savedArticle.updatedAt || new Date().toISOString())}` : '当前内容已手动保存。',
+      )
+      if (!silent) {
+        setServerMessage(status === 'published' ? '笔记已发布。' : '草稿已保存。')
+      }
       return savedArticle
     } catch (error) {
-      setServerMessage(error instanceof Error ? error.message : 'Unable to save the note article.')
+      setArticleAutoSaveLabel(silent ? '自动保存失败，请稍后重试。' : '手动保存失败。')
+      setServerMessage(error instanceof Error ? error.message : '保存笔记失败，请稍后重试。')
       return null
     } finally {
       setIsSavingArticle(false)
@@ -2162,7 +2383,7 @@ function App() {
       [articleDraft.id],
       '删除笔记',
       '确认删除',
-      `确认删除“${articleDraft.title || 'Untitled Note'}”吗？删除后无法恢复，附件也会一起删除。`,
+      `确认删除“${articleDraft.title || '未命名笔记'}”吗？删除后无法恢复，附件也会一起删除。`,
     )
   }
 
@@ -2173,9 +2394,9 @@ function App() {
     try {
       const coverImage = await readFileAsDataUrl(file)
       setArticleDraft((current) => ({ ...current, coverImage }))
-      setServerMessage('Cover image loaded into the editor.')
+      setServerMessage('封面图片已加载到编辑区。')
     } catch {
-      setServerMessage('Unable to read the cover image.')
+      setServerMessage('读取封面图片失败。')
     } finally {
       event.target.value = ''
     }
@@ -2197,7 +2418,7 @@ function App() {
     }
 
     setIsUploadingArticleAssets(true)
-    setServerMessage('Uploading note attachments...')
+    setServerMessage('正在上传笔记附件...')
 
     try {
       let nextArticles = articles
@@ -2223,9 +2444,9 @@ function App() {
       setActiveArticleId(articleId)
       setArticleDraft(latestArticle)
       setIsCreatingArticle(false)
-      setServerMessage('Article attachments uploaded successfully.')
+      setServerMessage('笔记附件上传成功。')
     } catch (error) {
-      setServerMessage(error instanceof Error ? error.message : 'Attachment upload failed.')
+      setServerMessage(error instanceof Error ? error.message : '附件上传失败，请稍后重试。')
     } finally {
       setIsUploadingArticleAssets(false)
       event.target.value = ''
@@ -2234,7 +2455,7 @@ function App() {
 
   async function handleDeleteArticleAttachment(attachment) {
     if (!token || !articleDraft.id || !attachment?.id) return
-    const shouldDelete = window.confirm(`Delete attachment "${attachment.title || 'attachment'}"?`)
+    const shouldDelete = window.confirm(`确认删除附件“${attachment.title || '未命名附件'}”吗？`)
     if (!shouldDelete) return
 
     try {
@@ -2255,9 +2476,9 @@ function App() {
       setArticles(nextArticles)
       setArticleDraft(nextArticle)
       setActiveNote((current) => (current?.id === attachment.id ? null : current))
-      setServerMessage('Attachment deleted.')
+      setServerMessage('附件已删除。')
     } catch (error) {
-      setServerMessage(error instanceof Error ? error.message : 'Unable to delete the attachment.')
+      setServerMessage(error instanceof Error ? error.message : '删除附件失败，请稍后重试。')
     }
   }
 
@@ -2271,21 +2492,21 @@ function App() {
     selectedArticles.forEach((article, index) => {
       window.setTimeout(() => downloadArticle(article), index * 150)
     })
-    setServerMessage(`Started downloading ${selectedArticles.length} note articles.`)
+    setServerMessage(`已开始下载 ${selectedArticles.length} 篇笔记。`)
   }
 
   async function uploadNotes(files, isFolderUpload = false) {
     if (!files.length || !token) return
 
     setIsUploading(true)
-    setServerMessage(isFolderUpload ? 'Reading folder and syncing to server...' : 'Reading files and syncing to server...')
+    setServerMessage(isFolderUpload ? '正在读取文件夹并同步到服务器...' : '正在读取文件并同步到服务器...')
 
     try {
       let latestNotes = notes
 
       for (let index = 0; index < files.length; index += 1) {
         if (files.length > 1) {
-          setServerMessage(`Uploading file ${index + 1}/${files.length}...`)
+          setServerMessage(`正在上传文件 ${index + 1}/${files.length}...`)
         }
 
         const data = await apiFetch(
@@ -2302,9 +2523,9 @@ function App() {
 
       setNotes(latestNotes)
       setSelectedNoteIds([])
-      setServerMessage(isFolderUpload ? 'Folder upload completed.' : 'Files uploaded successfully.')
+      setServerMessage(isFolderUpload ? '文件夹上传完成。' : '文件上传成功。')
     } catch (error) {
-      setServerMessage(error instanceof Error ? error.message : 'Upload failed. Please try again later.')
+      setServerMessage(error instanceof Error ? error.message : '上传失败，请稍后重试。')
     } finally {
       setIsUploading(false)
     }
@@ -2351,14 +2572,14 @@ function App() {
     if (!files.length || !token || !activeProjectId) return
 
     setIsUploadingProject(true)
-    setServerMessage(isFolderUpload ? 'Uploading project folder...' : 'Uploading project files...')
+    setServerMessage(isFolderUpload ? '正在上传项目文件夹...' : '正在上传项目文件...')
 
     try {
       let nextProjects = projects
 
       for (let index = 0; index < files.length; index += 1) {
         if (files.length > 1) {
-          setServerMessage(`Uploading project file ${index + 1}/${files.length}...`)
+          setServerMessage(`正在上传项目文件 ${index + 1}/${files.length}...`)
         }
 
         const data = await apiFetch(
@@ -2376,9 +2597,9 @@ function App() {
       }
 
       setProjects(nextProjects)
-      setServerMessage(isFolderUpload ? 'Project folder upload completed.' : 'Project files uploaded successfully.')
+      setServerMessage(isFolderUpload ? '项目文件夹上传完成。' : '项目文件上传成功。')
     } catch (error) {
-      setServerMessage(error instanceof Error ? error.message : 'Project upload failed. Please try again later.')
+      setServerMessage(error instanceof Error ? error.message : '项目上传失败，请稍后重试。')
     } finally {
       setIsUploadingProject(false)
     }
@@ -2400,9 +2621,9 @@ function App() {
     setConfirmConfig({
       action: 'trash',
       noteIds: [note.id],
-      title: '移动到垃圾管理',
+      title: '移动到回收站',
       confirmText: '确认删除',
-      description: `确认将“${note.title}”移入垃圾管理吗？移入后不会立刻彻底删除。`,
+      description: `确认将“${note.title}”移入回收站吗？移入后不会立刻彻底删除。`,
     })
   }
 
@@ -2533,7 +2754,7 @@ function App() {
         setArticleDraft((current) => (current?.id && ids.includes(current.id) ? nextArticles[0] || createEmptyArticle() : current))
         setIsCreatingArticle(!nextArticles.length)
         setConfirmConfig(null)
-        setServerMessage(ids.length > 1 ? `Deleted ${ids.length} note articles.` : 'Note article deleted.')
+        setServerMessage(ids.length > 1 ? `已删除 ${ids.length} 篇笔记。` : '笔记已删除。')
         return
       }
 
@@ -2556,13 +2777,13 @@ function App() {
 
       if (currentAction.action === 'trash') {
         setSelectedNoteIds([])
-        setServerMessage(ids.length > 1 ? `已将 ${ids.length} 个文件移入垃圾管理。` : '文件已移入垃圾管理。')
+        setServerMessage(ids.length > 1 ? `已将 ${ids.length} 个文件移入回收站。` : '文件已移入回收站。')
       } else if (currentAction.action === 'restore') {
         setSelectedTrashIds([])
         setServerMessage(ids.length > 1 ? `已恢复 ${ids.length} 个文件。` : '文件已恢复到常用文件区。')
       } else {
         setSelectedTrashIds([])
-        setServerMessage(ids.length > 1 ? `已彻底删除 ${ids.length} 个文件。` : '文件已从垃圾管理中彻底删除。')
+        setServerMessage(ids.length > 1 ? `已彻底删除 ${ids.length} 个文件。` : '文件已从回收站中彻底删除。')
       }
     } catch (error) {
       setServerMessage(error instanceof Error ? error.message : '操作失败，请稍后重试。')
@@ -2595,6 +2816,7 @@ function App() {
       articles={articles}
       articleDraft={articleDraft}
       articleQuery={articleQuery}
+      articleAutoSaveLabel={articleAutoSaveLabel}
       activeArticleId={activeArticleId}
       selectedArticleIds={selectedArticleIds}
       selectedNoteIds={selectedNoteIds}
@@ -2680,7 +2902,7 @@ function App() {
       onClearProjectSelection={() => setSelectedProjectNoteIds([])}
       onBatchDownloadNotes={() => handleBatchDownload(filteredNotes, selectedNoteIds, '请先选择要下载的常用文件。')}
       onBatchDeleteNotes={() =>
-        openBatchConfirm('trash', selectedNoteIds, '批量移动到垃圾管理', '确认批量删除', `确认删除 ${selectedNoteIds.length} 个已选择的常用文件吗？确认后会先移入垃圾管理。`)
+        openBatchConfirm('trash', selectedNoteIds, '批量移动到回收站', '确认批量删除', `确认删除 ${selectedNoteIds.length} 个已选择的常用文件吗？确认后会先移入回收站。`)
       }
       onBatchDownloadTrash={() => handleBatchDownload(trashedNotes, selectedTrashIds, '请先选择要下载的已删除文件。')}
       onBatchRestoreTrash={() =>
