@@ -25,6 +25,20 @@ const SUPPORTED_ACCEPT = [
 ].join(',')
 
 const ARTICLE_AUTO_SAVE_DELAY_MS = 1200
+const RICH_TEXT_FONT_OPTIONS = [
+  { label: '杂志衬线', value: '"Palatino Linotype", "Georgia", "STSong", "Songti SC", serif' },
+  { label: '现代无衬线', value: '"Segoe UI", "PingFang SC", "Microsoft YaHei UI", sans-serif' },
+  { label: '书卷宋体', value: '"Noto Serif SC", "Source Han Serif SC", "Songti SC", serif' },
+  { label: '等宽记录', value: '"Cascadia Code", "Consolas", "Courier New", monospace' },
+]
+
+const RICH_TEXT_SIZE_OPTIONS = [
+  { label: '14', value: '14px' },
+  { label: '16', value: '16px' },
+  { label: '18', value: '18px' },
+  { label: '20', value: '20px' },
+  { label: '24', value: '24px' },
+]
 
 const profile = {
   name: '翎羽晨风',
@@ -153,24 +167,24 @@ const pageMeta = {
     description: '查看账号、项目、常用文件与长期保存结构。',
   },
   notes: {
-    eyebrow: '常用文件',
-    title: '常用文件区',
-    description: '上传文件、上传文件夹、搜索内容并进行批量管理。',
+    eyebrow: '资料中心',
+    title: '资料中心',
+    description: '集中管理常用资料，支持上传、检索、预览与批量操作。',
   },
   writing: {
-    eyebrow: '笔记工作台',
-    title: '笔记管理',
-    description: '像博客后台一样管理笔记，支持标题、摘要、正文、封面、标签与附件。',
+    eyebrow: '内容创作',
+    title: '内容创作',
+    description: '用于撰写、整理和沉淀内容，支持标题、摘要、正文、封面、标签与附件。',
   },
   projects: {
-    eyebrow: '项目',
-    title: '项目管理区',
-    description: '创建项目、搜索项目名称，并在每个项目里单独上传文件或文件夹。',
+    eyebrow: '项目空间',
+    title: '项目空间',
+    description: '按项目归档资料与文件夹结构，方便长期分类管理与持续更新。',
   },
   trash: {
-    eyebrow: '回收站',
-    title: '回收站管理区',
-    description: '恢复已删除常用文件，或进行最终彻底删除。',
+    eyebrow: '回收记录',
+    title: '回收记录',
+    description: '集中查看已移除内容，可恢复、下载或执行最终清理。',
   },
 }
 
@@ -344,9 +358,62 @@ function downloadNote(note) {
 function buildArticleDownloadContent(article) {
   const tagsLine = Array.isArray(article.tags) && article.tags.length ? `标签：${article.tags.join(', ')}` : '标签：'
   const summaryLine = article.summary ? `摘要：\n${article.summary}` : '摘要：'
-  const contentLine = article.content ? `正文：\n${article.content}` : '正文：'
+  const contentLine = article.content ? `正文：\n${stripHtml(article.content)}` : '正文：'
 
   return [`# ${article.title || '未命名笔记'}`, tagsLine, '', summaryLine, '', contentLine].join('\n')
+}
+
+function decodeHtmlEntities(value) {
+  return String(value || '')
+    .replace(/&nbsp;/g, ' ')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/&amp;/g, '&')
+}
+
+function stripHtml(value) {
+  return decodeHtmlEntities(
+    String(value || '')
+      .replace(/<br\s*\/?>/gi, '\n')
+      .replace(/<\/(p|div|h1|h2|h3|h4|h5|h6|blockquote)>/gi, '\n')
+      .replace(/<li>/gi, '- ')
+      .replace(/<\/li>/gi, '\n')
+      .replace(/<[^>]+>/g, ''),
+  )
+    .replace(/\n{3,}/g, '\n\n')
+    .trim()
+}
+
+function escapeHtml(value) {
+  return String(value || '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;')
+}
+
+function looksLikeHtml(value) {
+  return /<\/?[a-z][\s\S]*>/i.test(String(value || ''))
+}
+
+function contentToEditorHtml(value) {
+  if (!value) return ''
+  if (looksLikeHtml(value)) return String(value)
+  return escapeHtml(value).replace(/\r?\n/g, '<br>')
+}
+
+function normalizeEditorHtml(value) {
+  const normalized = String(value || '')
+    .replace(/<div><br><\/div>/gi, '<br>')
+    .replace(/<div>/gi, '<p>')
+    .replace(/<\/div>/gi, '</p>')
+    .replace(/<p><\/p>/gi, '')
+    .trim()
+
+  return stripHtml(normalized) ? normalized : ''
 }
 
 function buildArticleDraftFingerprint(article) {
@@ -1114,6 +1181,7 @@ function WritingView({
   onOpenAttachment,
   onDeleteAttachment,
 }) {
+  const editorRef = useRef(null)
   const filteredArticles = useMemo(() => {
     const keyword = articleQuery.trim().toLowerCase()
     if (!keyword) return articles
@@ -1129,15 +1197,141 @@ function WritingView({
   const articleCountLabel = `${articles.length} 篇笔记`
   const attachmentCount = Array.isArray(articleDraft.attachments) ? articleDraft.attachments.length : 0
   const allSelected = filteredArticles.length > 0 && filteredArticles.every((article) => selectedArticleIds.includes(article.id))
+  const [typographyStyle, setTypographyStyle] = useState({
+    fontPreset: 'editorial',
+    fontSize: '18px',
+    colorPreset: 'ink',
+  })
+
+  const fontPresetMap = {
+    editorial: {
+      label: '杂志感',
+      editorFont: '"Palatino Linotype", "Georgia", "STSong", "Songti SC", serif',
+      previewFont: '"Palatino Linotype", "Georgia", "STSong", "Songti SC", serif',
+      titleFont: '"Georgia", "Times New Roman", "Songti SC", serif',
+      lineHeight: '2',
+    },
+    modern: {
+      label: '现代感',
+      editorFont: '"Segoe UI", "PingFang SC", "Microsoft YaHei UI", sans-serif',
+      previewFont: '"Segoe UI", "PingFang SC", "Microsoft YaHei UI", sans-serif',
+      titleFont: '"Segoe UI", "PingFang SC", "Microsoft YaHei UI", sans-serif',
+      lineHeight: '1.9',
+    },
+    classic: {
+      label: '书卷感',
+      editorFont: '"Noto Serif SC", "Source Han Serif SC", "Songti SC", serif',
+      previewFont: '"Noto Serif SC", "Source Han Serif SC", "Songti SC", serif',
+      titleFont: '"Noto Serif SC", "Source Han Serif SC", "Songti SC", serif',
+      lineHeight: '2.06',
+    },
+  }
+
+  const colorPresetMap = {
+    ink: {
+      label: '墨黑',
+      text: '#20293a',
+      summary: '#5d6574',
+      panel: 'rgba(255, 255, 255, 0.92)',
+    },
+    pine: {
+      label: '松青',
+      text: '#1f3a34',
+      summary: '#59706a',
+      panel: 'rgba(246, 251, 249, 0.94)',
+    },
+    plum: {
+      label: '梅灰',
+      text: '#3d3042',
+      summary: '#76687a',
+      panel: 'rgba(251, 247, 251, 0.94)',
+    },
+  }
+
+  const activeFontPreset = fontPresetMap[typographyStyle.fontPreset] || fontPresetMap.editorial
+  const activeColorPreset = colorPresetMap[typographyStyle.colorPreset] || colorPresetMap.ink
+  const editorHtml = contentToEditorHtml(articleDraft.content)
+  const writingTypographyStyle = {
+    '--writing-editor-font-active': activeFontPreset.editorFont,
+    '--writing-preview-font-active': activeFontPreset.previewFont,
+    '--writing-title-font-active': activeFontPreset.titleFont,
+    '--writing-font-size-active': typographyStyle.fontSize,
+    '--writing-line-height-active': activeFontPreset.lineHeight,
+    '--writing-text-color-active': activeColorPreset.text,
+    '--writing-summary-color-active': activeColorPreset.summary,
+    '--writing-panel-tint-active': activeColorPreset.panel,
+  }
+
+  useEffect(() => {
+    if (!editorRef.current) return
+
+    const nextHtml = editorHtml
+    if (editorRef.current.innerHTML !== nextHtml) {
+      editorRef.current.innerHTML = nextHtml
+    }
+  }, [editorHtml])
+
+  useEffect(() => {
+    if (typeof document !== 'undefined' && document.queryCommandSupported?.('styleWithCSS')) {
+      document.execCommand('styleWithCSS', false, true)
+    }
+  }, [])
+
+  function focusEditor() {
+    editorRef.current?.focus()
+  }
+
+  function handleEditorInput(event) {
+    onArticleFieldChange('content', normalizeEditorHtml(event.currentTarget.innerHTML))
+  }
+
+  function applyRichTextCommand(command, value = null) {
+    focusEditor()
+    document.execCommand('styleWithCSS', false, true)
+    document.execCommand(command, false, value)
+    onArticleFieldChange('content', normalizeEditorHtml(editorRef.current?.innerHTML || ''))
+  }
+
+  function handleFontFamilyChange(value) {
+    applyRichTextCommand('fontName', value)
+  }
+
+  function handleFontSizeChange(value) {
+    applyRichTextCommand('fontSize', '7')
+    const selection = window.getSelection()
+    if (!selection?.anchorNode || !editorRef.current) {
+      onArticleFieldChange('content', normalizeEditorHtml(editorRef.current?.innerHTML || ''))
+      return
+    }
+
+    const root = selection.anchorNode.nodeType === Node.ELEMENT_NODE ? selection.anchorNode : selection.anchorNode.parentElement
+    const fontNode = root?.closest?.('font[size="7"]')
+    if (fontNode) {
+      const span = document.createElement('span')
+      span.style.fontSize = value
+      span.innerHTML = fontNode.innerHTML
+      fontNode.replaceWith(span)
+    }
+
+    onArticleFieldChange('content', normalizeEditorHtml(editorRef.current?.innerHTML || ''))
+  }
+
+  function handleTextColorChange(value) {
+    applyRichTextCommand('foreColor', value)
+  }
+
+  function handleClearFormatting() {
+    applyRichTextCommand('removeFormat')
+  }
 
   return (
-    <section className="blog-section card section-writing">
+    <section className="blog-section card section-writing" style={writingTypographyStyle}>
       <div className="section-head">
         <div>
-          <p className="eyebrow">笔记工作台</p>
-          <h2>笔记管理页</h2>
+          <p className="eyebrow">内容创作</p>
+          <h2>内容创作</h2>
         </div>
-        <span>像 CSDN 后台一样编写、管理和发布长文笔记。</span>
+        <span>围绕主题写作、整理观点，并把内容沉淀为可持续复用的笔记资产。</span>
       </div>
 
       <div className="writing-layout">
@@ -1216,6 +1410,61 @@ function WritingView({
             </div>
           </div>
 
+          <section className="writing-style-panel card-lite">
+            <div className="writing-style-panel-head">
+              <div>
+                <p className="eyebrow">排版控制</p>
+                <h3>文字样式</h3>
+              </div>
+              <span>同步作用于编辑区与预览区</span>
+            </div>
+
+            <div className="writing-style-grid">
+              <label className="writing-style-field">
+                <span>字体风格</span>
+                <select
+                  value={typographyStyle.fontPreset}
+                  onChange={(event) => setTypographyStyle((current) => ({ ...current, fontPreset: event.target.value }))}
+                >
+                  {Object.entries(fontPresetMap).map(([key, item]) => (
+                    <option key={key} value={key}>
+                      {item.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+
+              <label className="writing-style-field">
+                <span>字号大小</span>
+                <select
+                  value={typographyStyle.fontSize}
+                  onChange={(event) => setTypographyStyle((current) => ({ ...current, fontSize: event.target.value }))}
+                >
+                  <option value="16px">紧凑</option>
+                  <option value="18px">舒适</option>
+                  <option value="20px">宽松</option>
+                  <option value="22px">阅读感</option>
+                </select>
+              </label>
+
+              <div className="writing-style-field">
+                <span>文字色调</span>
+                <div className="writing-tone-row">
+                  {Object.entries(colorPresetMap).map(([key, item]) => (
+                    <button
+                      key={key}
+                      type="button"
+                      className={typographyStyle.colorPreset === key ? 'tone-chip is-active' : 'tone-chip'}
+                      onClick={() => setTypographyStyle((current) => ({ ...current, colorPreset: key }))}
+                    >
+                      {item.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </section>
+
           <div className="writing-cover card-lite">
             <div className="writing-cover-preview">
               {articleDraft.coverImage ? <img src={articleDraft.coverImage} alt={articleDraft.title || '笔记封面'} /> : <div className="cover-placeholder">封面预览</div>}
@@ -1282,12 +1531,57 @@ function WritingView({
           <div className="writing-compose-grid">
             <label className="writing-field">
               <span>正文</span>
-              <textarea
-                className="writing-editor-textarea"
-                value={articleDraft.content}
-                rows={18}
-                placeholder="像写博客一样输入正文，可记录方案、过程、经验和结果。"
-                onChange={(event) => onArticleFieldChange('content', event.target.value)}
+              <div className="writing-rich-toolbar">
+                <button className="small-action" type="button" onClick={() => applyRichTextCommand('bold')}>
+                  加粗
+                </button>
+                <button className="small-action" type="button" onClick={() => applyRichTextCommand('italic')}>
+                  斜体
+                </button>
+                <button className="small-action" type="button" onClick={() => applyRichTextCommand('underline')}>
+                  下划线
+                </button>
+                <label className="inline-style-control">
+                  <span>字体</span>
+                  <select onChange={(event) => handleFontFamilyChange(event.target.value)} defaultValue="">
+                    <option value="" disabled>
+                      选择字体
+                    </option>
+                    {RICH_TEXT_FONT_OPTIONS.map((option) => (
+                      <option key={option.label} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label className="inline-style-control">
+                  <span>字号</span>
+                  <select onChange={(event) => handleFontSizeChange(event.target.value)} defaultValue="">
+                    <option value="" disabled>
+                      选择字号
+                    </option>
+                    {RICH_TEXT_SIZE_OPTIONS.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label className="inline-style-control inline-color-control">
+                  <span>颜色</span>
+                  <input type="color" defaultValue="#20293a" onChange={(event) => handleTextColorChange(event.target.value)} />
+                </label>
+                <button className="small-action" type="button" onClick={handleClearFormatting}>
+                  清除样式
+                </button>
+              </div>
+              <div
+                ref={editorRef}
+                className="writing-editor-textarea writing-rich-editor"
+                contentEditable
+                suppressContentEditableWarning
+                data-placeholder="像写博客一样输入正文，可记录方案、过程、经验和结果。"
+                onInput={handleEditorInput}
               />
             </label>
 
@@ -1298,7 +1592,11 @@ function WritingView({
               </div>
               <h2>{articleDraft.title || '未命名笔记'}</h2>
               <p className="writing-preview-summary">{articleDraft.summary || '这里会显示笔记摘要。'}</p>
-              <pre className="writing-preview-body">{articleDraft.content || '这里会实时预览正文内容。'}</pre>
+              {articleDraft.content ? (
+                <div className="writing-preview-body" dangerouslySetInnerHTML={{ __html: editorHtml }} />
+              ) : (
+                <div className="writing-preview-body writing-preview-placeholder">这里会实时预览正文内容。</div>
+              )}
             </section>
           </div>
 
@@ -1379,10 +1677,10 @@ function NotesView({
     <section className="blog-section card section-notes">
       <div className="section-head">
         <div>
-          <p className="eyebrow">常用文件</p>
-          <h2>常用文件区</h2>
+          <p className="eyebrow">资料中心</p>
+          <h2>资料中心</h2>
         </div>
-        <span>上传文件、上传文件夹、搜索和批量管理</span>
+        <span>集中整理日常资料，支持上传、搜索、预览与批量管理</span>
       </div>
 
       <div className="notes-toolbar">
@@ -1476,10 +1774,10 @@ function ProjectsView({
     <section className="blog-section card section-projects">
       <div className="section-head">
         <div>
-          <p className="eyebrow">项目</p>
-          <h2>项目管理区</h2>
+          <p className="eyebrow">项目空间</p>
+          <h2>项目空间</h2>
         </div>
-        <span>创建项目、搜索项目名、上传文件并保留文件夹结构</span>
+        <span>围绕项目归档资料与目录结构，方便持续迭代和长期沉淀</span>
       </div>
 
       <div className="project-topbar">
@@ -1594,10 +1892,10 @@ function TrashView({
     <section className="blog-section card section-trash">
       <div className="section-head">
         <div>
-          <p className="eyebrow">回收站</p>
-          <h2>回收站管理区</h2>
+          <p className="eyebrow">回收记录</p>
+          <h2>回收记录</h2>
         </div>
-        <span>恢复内容、批量下载、彻底删除</span>
+        <span>统一查看已移除内容，支持恢复、导出与最终清理</span>
       </div>
 
       <BatchToolbar
@@ -1641,15 +1939,15 @@ function SidebarPanel({ activePage, session, activeNotes, trashedNotes, projects
     return (
       <>
         <section className="sidebar-card card">
-          <p className="eyebrow">写作台</p>
-          <h3>博客写作台</h3>
-          <p className="sidebar-text">像 CSDN 后台一样写标题、摘要、正文、封面和附件。</p>
+          <p className="eyebrow">创作区</p>
+          <h3>内容工作台</h3>
+          <p className="sidebar-text">围绕主题组织标题、摘要、正文、封面与附件，形成可持续沉淀的内容。</p>
           <p className="sidebar-text">当前账号：{session.username}</p>
         </section>
 
         <section className="sidebar-card card">
-          <p className="eyebrow">提示</p>
-          <h3>推荐写法</h3>
+          <p className="eyebrow">写作建议</p>
+          <h3>内容结构建议</h3>
           <ul className="sidebar-list">
             <li>标题突出主题和结果</li>
             <li>摘要先写结论与价值</li>
@@ -1665,16 +1963,16 @@ function SidebarPanel({ activePage, session, activeNotes, trashedNotes, projects
     return (
       <>
         <section className="sidebar-card card">
-          <p className="eyebrow">项目</p>
-          <h3>项目概览</h3>
+          <p className="eyebrow">项目空间</p>
+          <h3>空间概览</h3>
           <p className="sidebar-text">项目数量：{projects.length}</p>
           <p className="sidebar-text">当前账号：{session.username}</p>
           <p className="sidebar-text">每个项目都有自己的文件和文件夹内容。</p>
         </section>
 
         <section className="sidebar-card card">
-          <p className="eyebrow">支持格式</p>
-          <h3>项目内可上传</h3>
+          <p className="eyebrow">支持内容</p>
+          <h3>空间内可归档</h3>
           <ul className="sidebar-list">
             <li>TXT、Markdown、JSON</li>
             <li>Excel、Word、PDF</li>
@@ -1690,8 +1988,8 @@ function SidebarPanel({ activePage, session, activeNotes, trashedNotes, projects
     return (
       <>
         <section className="sidebar-card card">
-          <p className="eyebrow">删除规则</p>
-          <h3>两段式删除</h3>
+          <p className="eyebrow">清理规则</p>
+          <h3>两段式清理</h3>
           <ul className="sidebar-list">
             <li>第一次删除：进入回收站管理。</li>
             <li>第二次删除：从服务器彻底清除。</li>
@@ -1700,8 +1998,8 @@ function SidebarPanel({ activePage, session, activeNotes, trashedNotes, projects
         </section>
 
         <section className="sidebar-card card">
-          <p className="eyebrow">统计</p>
-          <h3>回收情况</h3>
+          <p className="eyebrow">回收概览</p>
+          <h3>当前回收情况</h3>
           <p className="sidebar-text">回收站文件数：{trashedNotes.length}</p>
           <p className="sidebar-text">常用文件数：{activeNotes.length}</p>
         </section>

@@ -720,9 +720,54 @@ h1 {
 }
 
 .section-writing {
+  --writing-display-font: "Georgia", "Times New Roman", "Songti SC", serif;
+  --writing-ui-font:
+    "Segoe UI",
+    "PingFang SC",
+    "Microsoft YaHei UI",
+    "Helvetica Neue",
+    sans-serif;
+  --writing-body-font:
+    "Palatino Linotype",
+    "Georgia",
+    "STSong",
+    "Songti SC",
+    serif;
+  --writing-editor-font-active: var(--writing-body-font);
+  --writing-preview-font-active: var(--writing-body-font);
+  --writing-title-font-active: var(--writing-display-font);
+  --writing-font-size-active: 18px;
+  --writing-line-height-active: 2;
+  --writing-text-color-active: #20293a;
+  --writing-summary-color-active: #5d6574;
+  --writing-panel-tint-active: rgba(255, 255, 255, 0.92);
   background-image:
     linear-gradient(rgba(255, 255, 255, 0.9), rgba(255, 255, 255, 0.94)),
     url('/backgrounds/page-projects.svg');
+}
+
+.section-writing .section-head {
+  align-items: end;
+}
+
+.section-writing .section-head .eyebrow {
+  color: color-mix(in srgb, var(--page-accent) 88%, #7a3b20);
+  font-weight: 700;
+  letter-spacing: 0.16em;
+}
+
+.section-writing .section-head h2 {
+  font-family: var(--writing-display-font);
+  font-size: clamp(2rem, 3.4vw, 2.9rem);
+  font-weight: 700;
+  letter-spacing: -0.04em;
+}
+
+.section-writing .section-head span {
+  max-width: 48ch;
+  font-size: 0.98rem;
+  line-height: 1.8;
+  letter-spacing: 0.01em;
 }
 
 .writing-layout {
@@ -777,9 +822,8 @@ h1 {
   gap: 12px;
   margin-bottom: 10px;
   color: var(--text-soft);
-  font-size: 0.78rem;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
+  font-size: 0.76rem;
+  letter-spacing: 0.1em;
 }
 
 .status-dot {
@@ -799,11 +843,15 @@ h1 {
 
 .writing-card h3 {
   margin-bottom: 8px;
+  font-family: var(--writing-display-font);
+  font-size: 1.24rem;
+  letter-spacing: -0.02em;
 }
 
 .writing-card p {
   color: var(--text-soft);
-  line-height: 1.6;
+  line-height: 1.7;
+  font-size: 0.95rem;
 }
 
 .writing-card-main {
@@ -821,6 +869,86 @@ h1 {
   display: flex;
   flex-wrap: wrap;
   gap: 10px;
+}
+
+.writing-style-panel {
+  background:
+    linear-gradient(rgba(255, 255, 255, 0.9), rgba(255, 255, 255, 0.96)),
+    url('/backgrounds/card-steel.svg') center / cover no-repeat;
+}
+
+.writing-style-panel-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: start;
+  margin-bottom: 16px;
+}
+
+.writing-style-panel-head h3 {
+  margin-top: 6px;
+  font-family: var(--writing-display-font);
+  font-size: 1.4rem;
+  letter-spacing: -0.03em;
+}
+
+.writing-style-panel-head span {
+  color: var(--text-soft);
+  font-size: 0.88rem;
+}
+
+.writing-style-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.writing-style-field {
+  display: grid;
+  gap: 10px;
+}
+
+.writing-style-field span {
+  color: var(--text-faint);
+  font-size: 0.82rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.writing-style-field select {
+  width: 100%;
+  padding: 13px 14px;
+  border: 1px solid rgba(197, 210, 224, 0.92);
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.94);
+  color: #182236;
+  font-family: var(--writing-ui-font);
+  font-size: 0.95rem;
+}
+
+.writing-tone-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.tone-chip {
+  padding: 10px 14px;
+  border: 1px solid rgba(197, 210, 224, 0.92);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.92);
+  color: var(--text-soft);
+  font-weight: 700;
+  cursor: pointer;
+  transition: transform 160ms ease, border-color 160ms ease, box-shadow 160ms ease, color 160ms ease;
+}
+
+.tone-chip:hover,
+.tone-chip.is-active {
+  transform: translateY(-1px);
+  color: var(--page-accent);
+  border-color: color-mix(in srgb, var(--page-accent) 36%, white);
+  box-shadow: 0 10px 22px color-mix(in srgb, var(--page-accent) 10%, transparent);
 }
 
 .writing-cover {
@@ -863,10 +991,23 @@ h1 {
   gap: 10px;
 }
 
+.writing-field span,
+.writing-cover-fields span,
+.writing-preview-head span,
+.writing-assets-head span {
+  color: var(--text-faint);
+  font-size: 0.82rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
 .writing-title-input {
-  font-size: 2rem;
-  font-weight: 800;
-  letter-spacing: -0.03em;
+  font-family: var(--writing-title-font-active);
+  font-size: clamp(2.05rem, 3vw, 2.7rem);
+  font-weight: 700;
+  line-height: 1.2;
+  letter-spacing: -0.05em;
+  color: var(--writing-text-color-active);
 }
 
 .writing-chip-row {
@@ -885,7 +1026,78 @@ h1 {
 .writing-editor-textarea {
   min-height: 520px;
   resize: vertical;
-  line-height: 1.75;
+  padding: 20px 22px;
+  border: 1px solid rgba(197, 210, 224, 0.92);
+  border-radius: 20px;
+  background: var(--writing-panel-tint-active);
+  color: var(--writing-text-color-active);
+  font-family: var(--writing-editor-font-active);
+  font-size: var(--writing-font-size-active);
+  line-height: var(--writing-line-height-active);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.6);
+}
+
+.writing-rich-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+  padding: 14px;
+  border: 1px solid rgba(197, 210, 224, 0.92);
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.86);
+}
+
+.inline-style-control {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border-radius: 999px;
+  background: rgba(246, 248, 251, 0.96);
+  border: 1px solid rgba(221, 230, 240, 0.92);
+}
+
+.inline-style-control span {
+  color: var(--text-faint);
+  font-size: 0.78rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.inline-style-control select,
+.inline-style-control input {
+  border: 0;
+  background: transparent;
+  color: var(--text-main);
+  font-weight: 600;
+  outline: none;
+}
+
+.inline-style-control select {
+  min-width: 92px;
+}
+
+.inline-color-control input {
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border-radius: 999px;
+  cursor: pointer;
+}
+
+.writing-rich-editor {
+  position: relative;
+}
+
+.writing-rich-editor[contenteditable='true']:empty::before {
+  content: attr(data-placeholder);
+  color: #9aa5b5;
+  pointer-events: none;
+}
+
+.writing-rich-editor:focus {
+  outline: none;
 }
 
 .writing-preview {
@@ -893,18 +1105,58 @@ h1 {
   gap: 16px;
 }
 
+.writing-preview-head .eyebrow,
+.writing-assets-head .eyebrow,
+.writing-editor-top .eyebrow {
+  color: color-mix(in srgb, var(--page-accent) 84%, #7a3b20);
+  font-weight: 700;
+}
+
+.writing-preview h2 {
+  font-family: var(--writing-title-font-active);
+  font-size: clamp(1.8rem, 2.6vw, 2.45rem);
+  line-height: 1.22;
+  letter-spacing: -0.04em;
+  color: var(--writing-text-color-active);
+}
+
 .writing-preview-summary {
-  font-size: 1rem;
-  line-height: 1.7;
-  color: var(--text-soft);
+  font-family: var(--writing-preview-font-active);
+  font-size: 1.04rem;
+  line-height: 1.9;
+  color: var(--writing-summary-color-active);
+  border-left: 3px solid color-mix(in srgb, var(--page-accent) 40%, white);
+  padding-left: 14px;
 }
 
 .writing-preview-body {
   white-space: pre-wrap;
   word-break: break-word;
-  font-family: "Cascadia Code", "Consolas", "Courier New", monospace;
-  line-height: 1.8;
-  color: var(--text-main);
+  font-family: var(--writing-preview-font-active);
+  font-size: var(--writing-font-size-active);
+  line-height: var(--writing-line-height-active);
+  color: var(--writing-text-color-active);
+  letter-spacing: 0.01em;
+  background: color-mix(in srgb, var(--writing-panel-tint-active) 84%, white);
+  padding: 18px 20px;
+  border-radius: 18px;
+  border: 1px solid rgba(197, 210, 224, 0.78);
+}
+
+.writing-preview-body p {
+  margin: 0 0 1em;
+}
+
+.writing-preview-body p:last-child {
+  margin-bottom: 0;
+}
+
+.writing-preview-body span[style*='font-size'] {
+  line-height: inherit;
+}
+
+.writing-preview-placeholder {
+  color: var(--writing-summary-color-active);
 }
 
 .writing-attachment-list {
@@ -933,6 +1185,12 @@ h1 {
   cursor: pointer;
 }
 
+.writing-attachment-main strong {
+  font-size: 1rem;
+  font-weight: 700;
+  color: #182236;
+}
+
 .writing-attachment-item span {
   color: var(--text-soft);
 }
@@ -946,6 +1204,42 @@ h1 {
 .writing-search-box,
 .cover-upload-zone {
   min-height: auto;
+}
+
+.section-writing input,
+.section-writing textarea {
+  width: 100%;
+  outline: none;
+  transition: border-color 160ms ease, box-shadow 160ms ease, background 160ms ease;
+}
+
+.section-writing input {
+  padding: 13px 15px;
+  border: 1px solid rgba(197, 210, 224, 0.92);
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.94);
+  color: #182236;
+  font-family: var(--writing-ui-font);
+  font-size: 0.98rem;
+}
+
+.section-writing input:focus,
+.section-writing textarea:focus {
+  border-color: color-mix(in srgb, var(--page-accent) 48%, white);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--page-accent) 12%, transparent);
+  background: #ffffff;
+}
+
+.section-writing input::placeholder,
+.section-writing textarea::placeholder {
+  color: #9aa5b5;
+}
+
+.section-writing .tag {
+  padding: 7px 12px;
+  font-size: 0.82rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
 }
 
 .blog-post-card {
