@@ -200,3 +200,6 @@ npm.cmd run lint        # 检查代码
 
 用户名：FireFire
 密码：Fire20260723
+
+执行测试用例
+node test.mjs
