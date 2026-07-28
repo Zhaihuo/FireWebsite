@@ -1,4 +1,4 @@
-import { createHash, randomBytes } from 'node:crypto'
+import { randomBytes, scryptSync, timingSafeEqual } from 'node:crypto'
 import { createServer } from 'node:http'
 import { access, mkdir, readFile, rm, writeFile } from 'node:fs/promises'
 import { networkInterfaces } from 'node:os'
@@ -13,7 +13,7 @@ const uploadsDir = path.join(dataDir, 'uploads')
 const port = Number(process.env.PORT || 3100)
 const host = process.env.HOST || '0.0.0.0'
 const maxJsonBodyBytes = 25 * 1024 * 1024
-const maxUploadBodyBytes = Number(process.env.MAX_UPLOAD_BODY_BYTES || 200 * 1024 * 1024)
+const maxUploadBodyBytes = Number(process.env.MAX_UPLOAD_BODY_BYTES || 50 * 1024 * 1024)
 
 const defaultDb = {
   users: [],
@@ -75,7 +75,7 @@ function sendText(response, statusCode, text) {
 }
 
 function hashPassword(password, salt) {
-  return createHash('sha256').update(`${salt}:${password}`).digest('hex')
+  return scryptSync(password, salt, 64, { N: 16384, r: 8, p: 1 }).toString('hex')
 }
 
 function createToken() {
@@ -615,7 +615,17 @@ async function handleApi(request, response) {
       const db = await readDb()
       const user = db.users.find((item) => item.username === username)
 
-      if (!user || user.passwordHash !== hashPassword(password, user.salt)) {
+      if (!user) {
+        sendJson(response, 401, { message: '用户名或密码不正确。' })
+        return
+      }
+
+      const [storedHash, storedSalt] = [user.passwordHash, user.salt]
+      const computedHash = hashPassword(password, storedSalt)
+      const hashBuf = Buffer.from(storedHash, 'hex')
+      const compBuf = Buffer.from(computedHash, 'hex')
+
+      if (hashBuf.length !== compBuf.length || !timingSafeEqual(hashBuf, compBuf)) {
         sendJson(response, 401, { message: '用户名或密码不正确。' })
         return
       }
@@ -1154,7 +1164,12 @@ async function handleApi(request, response) {
       return
     }
 
-    if (auth.user.passwordHash !== hashPassword(password, auth.user.salt)) {
+    const [storedHash, storedSalt] = [auth.user.passwordHash, auth.user.salt]
+    const computedHash = hashPassword(password, storedSalt)
+    const hashBuf = Buffer.from(storedHash, 'hex')
+    const compBuf = Buffer.from(computedHash, 'hex')
+
+    if (hashBuf.length !== compBuf.length || !timingSafeEqual(hashBuf, compBuf)) {
       sendJson(response, 401, { message: 'Incorrect password.' })
       return
     }

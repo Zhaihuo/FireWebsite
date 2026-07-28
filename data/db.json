@@ -1,24 +1,9 @@
 {
   "sessions": [
     {
-      "token": "1bb41592c01ead9a37933c5cb786329a9ad4b77ef7c656d1",
-      "userId": "7114147b5892311902279dab",
-      "createdAt": "2026-07-24T03:29:55.938Z"
-    },
-    {
-      "token": "115fbeeb5065490440143924dcb6d80863d0666de84ec994",
-      "userId": "b9158d0bbd5959a34088e910",
-      "createdAt": "2026-07-24T03:30:19.677Z"
-    },
-    {
-      "token": "3eab7b08096589aee3eb5a4b72673f22048246d97bfce582",
-      "userId": "ed2ff610a64f3f1c2064827f",
-      "createdAt": "2026-07-24T08:31:41.050Z"
-    },
-    {
-      "token": "0e496fd933ba7226ca0aad1c61fc38aa2f7e59db705ee422",
-      "userId": "edb1357b68b7452fc60bf155",
-      "createdAt": "2026-07-24T08:41:56.130Z"
+      "token": "f5ce93730dd2d6365d0797d0fef90b3ff9537483b912d097",
+      "userId": "eaef2518fdab5a6fbf28b96f",
+      "createdAt": "2026-07-28T02:52:32.129Z"
     }
   ],
   "users": [
@@ -199,6 +184,16 @@
         }
       ],
       "createdAt": "2026-07-24T08:04:41.978Z"
+    },
+    {
+      "id": "eaef2518fdab5a6fbf28b96f",
+      "username": "firefire",
+      "passwordHash": "5dd7ab40021877c57ac908de7ff01d8c57b423291a1eef0579bbfc81cac7109b6cc3be3be901c8804173b553c3f4cf903242678ae0db4afcca10296d37f358a5",
+      "salt": "a9abad6bdd6ea1f53748e59b5aa7753d",
+      "notes": [],
+      "projects": [],
+      "articles": [],
+      "createdAt": "2026-07-28T02:52:32.129Z"
     }
   ]
 }
